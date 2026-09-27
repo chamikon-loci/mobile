@@ -74,3 +74,28 @@ export async function getAllTable(db) {
     const result = await db.getAllAsync(`SELECT * FROM Tables`)
     return result //คืนค่าเป็น Array ที่เก็บ Objects 
 }
+
+export async function getAllOrder(db) {
+    const result = await db.getAllAsync(`
+        SELECT
+            t.table_name AS table_name,
+            b.bill_id AS bill_id,
+            r.round AS round,
+            m.name AS menu_name,
+            c.category_name AS category_name
+        FROM Bills AS b
+        JOIN Tables AS t ON b.table_id = t.table_id
+        JOIN Order_Rounds AS r ON r.bill_id = b.bill_id
+        JOIN Order_Items AS oi ON oi.order_round_id = r.order_round_id
+        JOIN Menu AS m ON oi.menu_id = m.menu_id
+        JOIN Categories AS c ON c.category_id = m.category_id
+    `)
+
+    return result
+}
+
+export async function getAllBill(db) {
+    const result = await getAllAsync(`
+        
+    `)
+}
