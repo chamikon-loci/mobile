@@ -99,3 +99,24 @@ export async function getAllBill(db) {
         
     `)
 }
+
+export async function createOrderRound(db, bill_id, cartItem) {
+    await db.withTransactionAsync(async () => {
+        const roundResult = await db.getFirstAsync(`
+            SELECT MAX(round) AS max_round FROM Order_Rounds WHERE bill_id = ?`, [bill_id]);
+        
+        const currentRound = roundResult?.max_round || 0;
+        const nextRound = currentRound + 1;
+
+        const roundInsert = await db.runAsync(`
+            INSERT INTO Order_Rounds (bill_id, round, order_at) VALUES (?, ?, datetime('now'))`, [bill_id, nextRound]);
+        
+        const orderRoundId = roundInsert.lastInsertRowId;
+        for(const item of cartItem) {
+            await db.runAsync(`
+                INSERT INTO Order_Items (order_round_id, menu_id, amount, unit_price, status) VALUES (?, ?, ?, ?, ?)`, 
+                [orderRoundId, item.menu_id, item.amount, item.unit_price, item.status]);
+            }
+    
+        })
+}
