@@ -18,7 +18,7 @@ function Login({changepage}) {
             <View style={styles.top}>
                 <Image style={styles.logo} source={require('../photo/OIP.webp')}/>
             <View >
-                    <Text style={styles.welcome}>{tab==='client'?'Welcome to my Restaurant':'Employee'}</Text>
+                    <Text style={styles.welcome}>{tab==='client'?'Welcome to my Restaurant':'You are Employee'}</Text>
             </View>
                 
             </View >
