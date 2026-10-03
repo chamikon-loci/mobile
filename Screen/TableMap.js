@@ -1,985 +1,520 @@
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground, Image, TextInput, ScrollView } from 'react-native'
 import { colors } from '../src/style/theme'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite'
+import { DATABASE_NAME, getAllTable, insertTable, openDATABASE, openBill, getOpenBillByTable } from '../database/db'
 
-
+const initTables = [
+    { Table_Name: 'T1', Status: 'available' }, { Table_Name: 'T2', Status: 'available' }, { Table_Name: 'T3', Status: 'available' },
+    { Table_Name: 'T4', Status: 'available' }, { Table_Name: 'T5', Status: 'available' }, { Table_Name: 'T6', Status: 'available' },
+    { Table_Name: 'T7', Status: 'available' }, { Table_Name: 'T8', Status: 'available' }, { Table_Name: 'T9', Status: 'available' },
+    { Table_Name: 'T10', Status: 'available' }, { Table_Name: 'T11', Status: 'available' }, { Table_Name: 'T12', Status: 'available' },
+    { Table_Name: 'T13', Status: 'available' }, { Table_Name: 'T14', Status: 'available' }, { Table_Name: 'T15', Status: 'available' },
+]
 
 function TableMap({ changepage }) {
-    //history , close , open , opened , pay
-    const [open, setopen] = useState('close')
-    const [allow, setallow] = useState(false)
-    const [move, setmove] = useState('none')
+    return (
+        <SQLiteProvider onInit={openDATABASE} databaseName={DATABASE_NAME}>
+            <TableMapScreen changepage={changepage} />
+        </SQLiteProvider>
+    )
+}
 
+function TableMapScreen({ changepage }) {
+    const db = useSQLiteContext()
+    const [table, setTable] = useState([])
+    const [customerName, setCustomerName] = useState('')
+    const [customerCount, setCustomerCount] = useState('')
+    const [phone, setPhone] = useState('')
+    const [selectedTable, setSelectedTable] = useState(null)
+    const [billId, setBillId] = useState(null)
+    const [selectedBill, setSelectedBill] = useState(null)
 
-    function openedtable() {
-        setopen('close');
-        setallow(true)
+    useEffect(() => {
+        const loadTable = async () => {
+            try {
+                await insertTable(db, initTables)
+                const data = await getAllTable(db)
+                setTable(data)
+            } catch (error) {
+                console.log('โหลดข้อมูลโต๊ะไม่สำเร็จ', error)
+            }
+        }
+        loadTable()
+    }, [])
 
-    }
+    async function openTable() {
+        if (!selectedTable) return
 
-    function pagetable() {
-        if (allow === true) {
-            setopen('opened')
-        } else {
-            setopen('open')
+        if (!customerName.trim()) {
+            console.log('กรุณากรอกชื่อลูกค้า')
+            return
+        }
+
+        if (Number(customerCount) <= 0) {
+            console.log('กรุณากรอกจำนวนลูกค้า')
+            return
+        }
+
+        try {
+            const bill = await openBill(
+                db,
+                selectedTable.table_id,
+                customerName.trim(),
+                Number(customerCount),
+                phone.trim()
+            )
+
+            setBillId(bill.bill_id)
+
+            setTable(prev =>
+                prev.map(item =>
+                    item.table_id === selectedTable.table_id
+                        ? { ...item, table_status: 'occupied' }
+                        : item
+                )
+            )
+
+            setCustomerName('')
+            setCustomerCount('')
+            setPhone('')
+        } catch (error) {
+            console.log('เปิดโต๊ะไม่สำเร็จ', error)
         }
     }
 
-    function closedtable() {
-        setopen('close');
-        setallow(false)
+    function backToTableMap() {
+        setSelectedTable(null)
+        setSelectedBill(null)
+        setCustomerName('')
+        setCustomerCount('')
+        setPhone('')
     }
 
-    return (
+    const available = table.filter(item => item.table_status === 'available').length
+    const notavailable = table.filter(item => item.table_status !== 'available').length
 
-        open === 'close' ?
-            <ImageBackground source={require('../photo/TableMap.jpg')} style={style.content}>
+    // หน้าแสดงรหัสบิลหลังเปิดโต๊ะ
+    if (billId) {
+        return (
+            <ImageBackground source={require('../photo/addtable.webp')} style={style.content}>
+                <View style={style.billcode}>
+                    <Text style={style.billcodetitle}>เปิดโต๊ะสำเร็จ</Text>
+                    <Text style={style.billcodename}>รหัสบิล</Text>
+                    <Text style={style.billid}>{billId}</Text>
+                    <Text style={style.billcodeinfo}>กรุณาแจ้งรหัสนี้ให้ลูกค้า</Text>
+                    <Text style={style.billcodeinfo}>เพื่อใช้สั่งอาหารจากเครื่องบนโต๊ะ</Text>
 
-                <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => { changepage('Login') }}>
-                    <Image source={require('../photo/back.png')} style={style.back}></Image>
-                </TouchableOpacity>
-                <View style={style.top}>
-
-                    <View style={{ boxShadow: '0 0 10px rgba(0,0,0,0.5)', paddingLeft: 20, paddingRight: 20, borderRadius: 50 }}>
-                        <Text style={style.title}>Table</Text>
-                    </View>
+                    <TouchableOpacity
+                        style={style.butopen}
+                        onPress={() => {
+                            setBillId(null)
+                            setSelectedTable(null)
+                            setSelectedBill(null)
+                        }}
+                    >
+                        <Text style={style.textbut}>กลับหน้าหลัก</Text>
+                    </TouchableOpacity>
                 </View>
-
-                <View style={{ alignItems: 'center' }}>
-                    <View style={style.statustable}>
-                        <Text style={{ fontSize: 15 }}>จำนวนโต๊ะที่ว่าง : 13  <View style={{ backgroundColor: colors.red, width: 15, height: 15 }}></View></Text>
-                        <Text style={{ fontSize: 15 }}>จำนวนโต๊ะที่ไม่ว่าง : 2  <View style={{
-                            backgroundColor: colors.dim, width: 15, height: 15
-                        }}></View></Text>
-                    </View>
-                </View>
-
-                <View>
-                    <View style={style.middle}>
-                        <TouchableOpacity style={style.tablenull} onPress={() => { { pagetable() } }}>
-                            <Text style={style.numtable}>1</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.tablenull}><Text style={style.numtable}>2</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>3</Text></TouchableOpacity>
-
-                    </View>
-
-                    <View style={style.middle}>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>4</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>5</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>6</Text></TouchableOpacity>
-
-                    </View>
-
-                    <View style={style.middle}>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>7</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>8</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>9</Text></TouchableOpacity>
-
-                    </View>
-
-
-                    <View style={style.middle}>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>10</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>11</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>12</Text></TouchableOpacity>
-
-                    </View>
-
-
-                    <View style={style.middle}>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>13</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>14</Text></TouchableOpacity>
-                        <TouchableOpacity style={style.table}><Text style={style.numtable}>15</Text></TouchableOpacity>
-
-                    </View>
-                </View>
-
-                <View style={style.bottombar}>
-                    <TouchableOpacity style={style.page} onPress={() => { changepage('TableMap') }}><Text style={style.titlepage}>Table</Text></TouchableOpacity>
-                    <TouchableOpacity style={style.page}><Text style={style.titlepage} onPress={() => { changepage('Order') }}>Order</Text></TouchableOpacity>
-                    <TouchableOpacity style={style.page} onPress={() => { changepage('Menu') }}><Text style={style.titlepage}>Menu</Text></TouchableOpacity>
-                    <TouchableOpacity style={style.page} onPress={() => { changepage('Account') }}><Text style={style.titlepage}>Account</Text></TouchableOpacity>
-                </View>
-
-
-
             </ImageBackground>
-            : open === 'open' ?
-                <ImageBackground source={require('../photo/addtable.webp')} style={style.content}>
+        )
+    }
 
-                    <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => { setopen('close') }}>
-                        <Image source={require('../photo/back.png')} style={style.back}></Image>
+    // เมื่อเลือกโต๊ะ
+    if (selectedTable) {
+        // โต๊ะมีบิลอยู่แล้ว
+        if (selectedTable.table_status === 'occupied') {
+            return (
+                <ImageBackground source={require('../photo/addtable.webp')} style={style.content}>
+                    <TouchableOpacity style={{ marginLeft: 10 }} onPress={backToTableMap}>
+                        <Image source={require('../photo/back.png')} style={style.back} />
                     </TouchableOpacity>
 
                     <View style={style.top}>
-                        <View style={{ boxShadow: '0 0 10px rgba(0,0,0,0.5)', paddingLeft: 20, paddingRight: 20, borderRadius: 50 }}>
-                            <Text style={style.title}>โต๊ะ 1</Text>
+                        <View style={style.titleContainer}>
+                            <Text style={style.title}>{selectedTable.table_name}</Text>
                         </View>
                     </View>
 
-
-                    <View style={style.contentopen}>
-                        <View style={style.boxdata}>
-                            <Text style={style.textopen}>รหัสบิล</Text>
-                            <TextInput style={style.box}></TextInput>
-                        </View>
-
-                        <View style={style.boxdata}>
-                            <Text style={style.textopen}>ชื่อ</Text>
-                            <TextInput style={style.box}></TextInput>
-                        </View>
-
-                        <View style={style.boxdata}>
-                            <Text style={style.textopen}>จำนวนคน</Text>
-                            <TextInput style={style.box}></TextInput>
-                        </View>
-
-                        <View style={style.boxdata}>
-                            <Text style={style.textopen}>เบอร์โทร</Text>
-                            <TextInput style={style.box}></TextInput>
-                        </View>
-                    </View>
-                    <View style={style.bottomopen}>
-                        <TouchableOpacity style={style.butopen} onPress={() => setopen('close')}>
-                            <Text style={style.textbut}>ยกเลิก</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity style={style.butopen} onPress={() => { openedtable() }}>
-                            <Text style={style.textbut}>เสร็จสิ้น</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                </ImageBackground>
-                : open === 'opened' ?
-                    <ImageBackground source={require('../photo/addtable.webp')} style={style.content}>
-
-                        <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => { setopen('close') }}>
-                            <Image source={require('../photo/back.png')} style={style.back}></Image>
-                        </TouchableOpacity>
-
-                        <View style={style.top}>
-                            <View style={{ boxShadow: '0 0 10px rgba(0,0,0,0.5)', paddingLeft: 20, paddingRight: 20, borderRadius: 50 }}>
-                                <Text style={style.title}>โต๊ะ 1</Text>
-                            </View>
-                        </View>
-
-
+                    <ScrollView>
                         <View style={style.contentopen}>
-                            <View style={style.boxdata}>
-                                <Text style={style.textopen}>รหัสบิล</Text>
-                                <TextInput style={style.box}>186698989</TextInput>
-                            </View>
+                            <Text style={style.billPageTitle}>ข้อมูลโต๊ะ</Text>
 
-                            <View style={style.boxdata}>
-                                <Text style={style.textopen}>ชื่อ</Text>
-                                <TextInput style={style.box}>Nanthicha</TextInput>
-                            </View>
-
-                            <View style={style.boxdata}>
-                                <Text style={style.textopen}>จำนวนคน</Text>
-                                <TextInput style={style.box}>2</TextInput>
-                            </View>
-
-                            <View style={style.boxdata}>
-                                <Text style={style.textopen}>เบอร์โทร</Text>
-                                <TextInput style={style.box}>0125586767</TextInput>
-                            </View>
-
-                            {move === 'none' ?
-                                <View style={style.bottomoption}>
-                                    <TouchableOpacity style={style.butopen} onPress={() => { setmove('move') }}>
-                                        <Text style={style.textbut} >ย้ายโต๊ะ</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity style={style.butopen} onPress={() => { setmove('edit') }}>
-                                        <Text style={style.textbut}>แก้ไขข้อมูล</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                : move === 'move' ?
+                            {selectedBill ? (
+                                <>
                                     <View style={style.boxdata}>
-                                        <Text style={style.textopen}>โต๊ะ</Text>
-
-                                        <View style={style.movetable}>
-                                            <TextInput style={style.boxmove}></TextInput>
-                                            <View style={style.optionmove}>
-                                                <TouchableOpacity style={style.butmovetable} onPress={() => { setmove('none') }}>
-                                                    <Text style={style.textbut}>ยกเลิก</Text>
-                                                </TouchableOpacity>
-
-                                                <TouchableOpacity style={style.butmovetable2} onPress={() => { setmove('none') }}>
-                                                    <Text style={style.textbut}>ยืนยัน</Text>
-                                                </TouchableOpacity>
-
-                                            </View>
-                                        </View>
-                                    </View>
-                                    :
-                                    <View style={style.areaedit}>
-                                        <View style={style.optionmove}>
-                                            <TouchableOpacity style={style.butmoveedit} onPress={() => { setmove('none') }}>
-                                                <Text style={style.textbut}>ยกเลิก</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity style={style.butmoveedit2} onPress={() => { setmove('none') }}>
-                                                <Text style={style.textbut}>ยืนยัน</Text>
-                                            </TouchableOpacity>
-
-                                        </View>
+                                        <Text style={style.textopen}>รหัสบิล</Text>
+                                        <Text style={style.infoText}>{selectedBill.bill_id}</Text>
                                     </View>
 
+                                    <View style={style.boxdata}>
+                                        <Text style={style.textopen}>ชื่อลูกค้า</Text>
+                                        <Text style={style.infoText}>{selectedBill.customer_name}</Text>
+                                    </View>
+
+                                    <View style={style.boxdata}>
+                                        <Text style={style.textopen}>จำนวนคน</Text>
+                                        <Text style={style.infoText}>{selectedBill.customer_count} คน</Text>
+                                    </View>
+
+                                    <View style={style.boxdata}>
+                                        <Text style={style.textopen}>เบอร์โทร</Text>
+                                        <Text style={style.infoText}>{selectedBill.phone || '-'}</Text>
+                                    </View>
+
+                                    <View style={style.boxdata}>
+                                        <Text style={style.textopen}>เวลาเปิดโต๊ะ</Text>
+                                        <Text style={style.infoText}>{selectedBill.open_at}</Text>
+                                    </View>
+
+                                    <View style={style.boxdata}>
+                                        <Text style={style.textopen}>สถานะ</Text>
+                                        <Text style={style.infoText}>{selectedBill.status}</Text>
+                                    </View>
+                                </>
+                            ) : (
+                                <Text style={style.noBillText}>ไม่พบข้อมูลบิลของโต๊ะนี้</Text>
+                            )}
+                        </View>
+                    </ScrollView>
+
+                    <View style={style.bottomopen}>
+                        <TouchableOpacity style={style.butopen} onPress={backToTableMap}>
+                            <Text style={style.textbut}>กลับ</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ImageBackground>
+            )
+        }
+
+        // โต๊ะว่าง
+        return (
+            <ImageBackground source={require('../photo/addtable.webp')} style={style.content}>
+                <TouchableOpacity style={{ marginLeft: 10 }} onPress={backToTableMap}>
+                    <Image source={require('../photo/back.png')} style={style.back} />
+                </TouchableOpacity>
+
+                <View style={style.top}>
+                    <View style={style.titleContainer}>
+                        <Text style={style.title}>{selectedTable.table_name}</Text>
+                    </View>
+                </View>
+
+                <View style={style.contentopen}>
+                    <View style={style.boxdata}>
+                        <Text style={style.textopen}>ชื่อ</Text>
+                        <TextInput
+                            style={style.box}
+                            value={customerName}
+                            onChangeText={setCustomerName}
+                        />
+                    </View>
+
+                    <View style={style.boxdata}>
+                        <Text style={style.textopen}>จำนวนคน</Text>
+                        <TextInput
+                            style={style.box}
+                            value={customerCount}
+                            onChangeText={setCustomerCount}
+                            keyboardType="numeric"
+                        />
+                    </View>
+
+                    <View style={style.boxdata}>
+                        <Text style={style.textopen}>เบอร์โทร</Text>
+                        <TextInput
+                            style={style.box}
+                            value={phone}
+                            onChangeText={setPhone}
+                            keyboardType="phone-pad"
+                        />
+                    </View>
+                </View>
+
+                <View style={style.bottomopen}>
+                    <TouchableOpacity style={style.butopen} onPress={backToTableMap}>
+                        <Text style={style.textbut}>ยกเลิก</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={style.butopen} onPress={openTable}>
+                        <Text style={style.textbut}>เปิดโต๊ะ</Text>
+                    </TouchableOpacity>
+                </View>
+            </ImageBackground>
+        )
+    }
+
+    // หน้าหลัก Table Map
+    return (
+        <ImageBackground source={require('../photo/TableMap.jpg')} style={style.content}>
+            <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => changepage('Login')}>
+                <Image source={require('../photo/back.png')} style={style.back} />
+            </TouchableOpacity>
+
+            <View style={style.top}>
+                <View style={style.titleContainer}>
+                    <Text style={style.title}>Table</Text>
+                </View>
+            </View>
+
+            <View style={{ alignItems: 'center' }}>
+                <View style={style.statustable}>
+                    <Text style={{ fontSize: 15 }}>จำนวนโต๊ะที่ว่าง : {available}</Text>
+                    <Text style={{ fontSize: 15 }}>จำนวนโต๊ะที่ไม่ว่าง : {notavailable}</Text>
+                </View>
+            </View>
+
+            <View>
+                <View style={style.middle}>
+                    {table.map(item => (
+                        <TouchableOpacity
+                            key={item.table_id}
+                            style={
+                                item.table_status === 'available'
+                                    ? style.tablenull
+                                    : style.table
                             }
-
-
-                        </View>
-
-                        <View style={style.bottomopendata2}>
-                            <TouchableOpacity style={style.butswitch} onPress={() => setopen('opened')}>
-                                <Text style={style.textswitch}>ข้อมูลโต๊ะ</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={style.butswitch} onPress={() => setopen('history')}>
-                                <Text style={style.textswitch}>ประวัติการสั่งอาหาร</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                    </ImageBackground>
-                    : open === 'history' ?
-
-                        <ImageBackground source={require('../photo/historyorder.jpg')} style={style.content}>
-                            <ScrollView contentContainerStyle={{ paddingBottom: 140 }}>
-
-                                <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => { setopen('close') }}>
-                                    <Image source={require('../photo/back.png')} style={style.back}></Image>
-                                </TouchableOpacity>
-
-                                <View style={style.tophistory}>
-                                    <View style={{ boxShadow: '0 0 10px rgba(0,0,0,0.5)', paddingLeft: 20, paddingRight: 20, borderRadius: 50 }}>
-                                        <Text style={style.titlehistory}>ประวัติการสั่งอาหาร</Text>
-                                    </View>
-                                </View>
-
-
-                                <View style={style.middlehistory}>
-
-                                    <View style={style.order}>
-
-                                        <View style={style.bill}>
-                                            <View style={style.rownotable}>
-                                                <Text style={style.notable}>โต๊ะที่ 1</Text>
-                                                <Text style={style.numround}>รอบที่ 1 เวลา : 15.00</Text>
-                                            </View>
-
-                                            <View style={style.columndata}>
-                                                <Text style={style.columnname1}>รายการอาหาร</Text>
-                                                <Text style={style.columnname2}>จำนวน</Text>
-                                                <Text style={style.columnname3}>เพิ่มเติม</Text>
-                                                <Text style={style.columnname4}>หมายเหตุ</Text>
-                                            </View>
-
-                                            <View style={style.listfood}>
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>เพิ่ม cherry</Text>
-                                                    <Text style={style.columnname4}>แพ้นมวัว</Text>
-                                                </View>
-
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>-</Text>
-                                                    <Text style={style.columnname4}>เพิ่มหวาน</Text>
-                                                </View>
-
-                                            </View>
-
-                                        </View>
-
-                                    </View>
-
-
-                                    <View style={style.order}>
-
-                                        <View style={style.bill}>
-                                            <View style={style.rownotable}>
-                                                <Text style={style.notable}>โต๊ะที่ 1</Text>
-                                                <Text style={style.numround}>รอบที่ 1 เวลา : 15.00</Text>
-                                            </View>
-
-                                            <View style={style.columndata}>
-                                                <Text style={style.columnname1}>รายการอาหาร</Text>
-                                                <Text style={style.columnname2}>จำนวน</Text>
-                                                <Text style={style.columnname3}>เพิ่มเติม</Text>
-                                                <Text style={style.columnname4}>หมายเหตุ</Text>
-                                            </View>
-
-                                            <View style={style.listfood}>
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>เพิ่ม cherry</Text>
-                                                    <Text style={style.columnname4}>แพ้นมวัว</Text>
-                                                </View>
-
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>-</Text>
-                                                    <Text style={style.columnname4}>เพิ่มหวาน</Text>
-                                                </View>
-
-                                            </View>
-
-                                        </View>
-
-                                    </View>
-
-
-                                    <View style={style.order}>
-
-                                        <View style={style.bill}>
-                                            <View style={style.rownotable}>
-                                                <Text style={style.notable}>โต๊ะที่ 1</Text>
-                                                <Text style={style.numround}>รอบที่ 1 เวลา : 15.00</Text>
-                                            </View>
-
-                                            <View style={style.columndata}>
-                                                <Text style={style.columnname1}>รายการอาหาร</Text>
-                                                <Text style={style.columnname2}>จำนวน</Text>
-                                                <Text style={style.columnname3}>เพิ่มเติม</Text>
-                                                <Text style={style.columnname4}>หมายเหตุ</Text>
-                                            </View>
-
-                                            <View style={style.listfood}>
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>เพิ่ม cherry</Text>
-                                                    <Text style={style.columnname4}>แพ้นมวัว</Text>
-                                                </View>
-
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>-</Text>
-                                                    <Text style={style.columnname4}>เพิ่มหวาน</Text>
-                                                </View>
-
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>เพิ่ม cherry</Text>
-                                                    <Text style={style.columnname4}>แพ้นมวัว</Text>
-                                                </View>
-
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>เพิ่ม cherry</Text>
-                                                    <Text style={style.columnname4}>แพ้นมวัว</Text>
-                                                </View>
-
-
-
-                                                <View style={style.list}>
-                                                    <Text style={style.columnname1}>Cake</Text>
-                                                    <Text style={style.columnname2}>2</Text>
-                                                    <Text style={style.columnname3}>เพิ่ม cherry</Text>
-                                                    <Text style={style.columnname4}>แพ้นมวัว</Text>
-                                                </View>
-
-
-                                            </View>
-
-                                        </View>
-
-                                    </View>
-
-
-
-                                </View>
-                            </ScrollView>
-
-                            <View style={style.bottomopendata}>
-                                <View style={style.bottompay}>
-                                    <View style={style.allbill}>
-                                        <Text style={style.paytext}>ยอดรวมทั้งหมด 400 บาท</Text>
-                                        <TouchableOpacity style={style.butpay} onPress={() => { setopen('pay') }}>
-                                            <Text style={style.pay}>ชำระเงิน</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-
-
-                                <View style={style.bottomopendata1}>
-                                    <TouchableOpacity style={style.butswitch} onPress={() => setopen('opened')}>
-                                        <Text style={style.textswitch}>ข้อมูลโต๊ะ</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity style={style.butswitch} onPress={() => setopen('history')}>
-                                        <Text style={style.textswitch}>ประวัติการสั่งอาหาร</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                        </ImageBackground>
-                        :
-                        <ImageBackground source={require('../photo/paypage.jpg')} style={style.content}>
-
-
-                            <View style={style.top}>
-                                <View style={{ boxShadow: '0 0 10px rgba(0,0,0,0.5)', paddingLeft: 20, paddingRight: 20, borderRadius: 50 }}>
-                                    <Text style={style.title}>โต๊ะ 1</Text>
-                                </View>
-                            </View>
-
-                            <View style={style.middlebill}>
-                                <View style={style.order}>
-
-
-                                    <View style={style.rowtitlebill}>
-                                        <Text style={{ fontSize: 25 }}>Bill</Text>
-                                        <Text style={style.numbill}>รหัสบิล :  789124345</Text>
-
-                                        <Text style={style.numbill}>วัน/เดือน/ปี : 29/09/2569 เวลา : 16.00</Text>
-
-                                    </View>
-                                    <View style={style.bill}>
-                                        <View style={style.rownotable}>
-                                            <Text style={style.notable}>โต๊ะที่ 1</Text>
-                                            <Text style={style.numround}>รอบที่ 1 เวลา : 15.00</Text>
-                                        </View>
-
-                                        <View style={style.columndata}>
-                                            <Text style={style.columnname1}>รายการอาหาร</Text>
-                                            <Text style={style.columnname2}>ราคา</Text>
-                                            <Text style={style.columnname3}>จำนวน</Text>
-                                            <Text style={style.columnname4}>ราคารวม</Text>
-                                        </View>
-
-                                        <View style={style.listfood}>
-                                            <View style={style.list}>
-                                                <Text style={style.columnname1}>Cake</Text>
-                                                <Text style={style.columnname2}>100</Text>
-                                                <Text style={style.columnname3}>2</Text>
-                                                <Text style={style.columnname4}>200</Text>
-                                            </View>
-
-                                            <View style={style.list}>
-                                                <Text style={style.columnname1}>Cake</Text>
-                                                <Text style={style.columnname2}>100</Text>
-                                                <Text style={style.columnname3}>2</Text>
-                                                <Text style={style.columnname4}>200</Text>
-                                            </View>
-
-
-                                            <View style={style.summary}>
-                                                <Text style={style.columnname1}>รวมทั้งหมด</Text>
-                                                <Text style={style.columnname2}></Text>
-                                                <Text style={style.columnname3}>4</Text>
-                                                <Text style={style.columnname4}>400</Text>
-                                            </View>
-                                        </View>
-
-                                    </View>
-
-
-                                    <View style={style.bill}>
-                                        <View style={style.rownotable}>
-                                            <Text style={style.notable}>โต๊ะที่ 1</Text>
-                                            <Text style={style.numround}>รอบที่ 2 เวลา : 15.40</Text>
-                                        </View>
-
-                                        <View style={style.columndata}>
-                                            <Text style={style.columnname1}>รายการอาหาร</Text>
-                                            <Text style={style.columnname2}>ราคา</Text>
-                                            <Text style={style.columnname3}>จำนวน</Text>
-                                            <Text style={style.columnname4}>ราคารวม</Text>
-                                        </View>
-
-                                        <View style={style.listfood}>
-                                            <View style={style.list}>
-                                                <Text style={style.columnname1}>Cake</Text>
-                                                <Text style={style.columnname2}>100</Text>
-                                                <Text style={style.columnname3}>2</Text>
-                                                <Text style={style.columnname4}>200</Text>
-                                            </View>
-
-                                            <View style={style.list}>
-                                                <Text style={style.columnname1}>Cake</Text>
-                                                <Text style={style.columnname2}>100</Text>
-                                                <Text style={style.columnname3}>2</Text>
-                                                <Text style={style.columnname4}>200</Text>
-                                            </View>
-
-
-                                            <View style={style.summary}>
-                                                <Text style={style.columnname1}>รวมทั้งหมด</Text>
-                                                <Text style={style.columnname2}></Text>
-                                                <Text style={style.columnname3}>4</Text>
-                                                <Text style={style.columnname4}>400</Text>
-                                            </View>
-                                        </View>
-
-                                    </View>
-
-
-                                    <View style={style.summarybill}>
-                                        <Text style={style.allbill}>ยอดรวมทั้งหมด : 400</Text>
-                                    </View>
-                                </View>
-                            </View>
-
-                            <View style={style.bottombill}>
-                                <View style={style.rowbutbill}>
-                                <TouchableOpacity style={style.butbill1} onPress={()=>{setopen('history')}}>
-                                    <Text style={style.textbutbill}>ยกเลิก</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={style.butbill2}
-                                onPress={()=>{closedtable()}}>
-                                    <Text style={style.textbutbill}>ชำระเงินเสร็จสิ้น</Text>
-                                </TouchableOpacity>
-                                </View>
-                            </View>
-
-                        </ImageBackground>
-
-
-
+                            onPress={async () => {
+                                if (item.table_status === 'occupied') {
+                                    try {
+                                        const bill = await getOpenBillByTable(db, item.table_id)
+                                        setSelectedBill(bill || null)
+                                        setSelectedTable(item)
+                                    } catch (error) {
+                                        console.log('โหลดข้อมูลบิลไม่สำเร็จ', error)
+                                    }
+                                } else {
+                                    setSelectedBill(null)
+                                    setSelectedTable(item)
+                                }
+                            }}
+                        >
+                            <Text style={style.numtable}>{item.table_name}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            <View style={style.bottombar}>
+                <TouchableOpacity style={style.page} onPress={() => changepage('TableMap')}>
+                    <Text style={style.titlepage}>Table</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={style.page} onPress={() => changepage('Order')}>
+                    <Text style={style.titlepage}>Order</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={style.page} onPress={() => changepage('Menu')}>
+                    <Text style={style.titlepage}>Menu</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={style.page} onPress={() => changepage('Account')}>
+                    <Text style={style.titlepage}>Account</Text>
+                </TouchableOpacity>
+            </View>
+        </ImageBackground>
     )
 }
 
 const style = StyleSheet.create({
     top: {
-
         alignItems: 'center',
-        marginBottom: '10',
+        marginBottom: 10,
         flexDirection: 'row',
         justifyContent: 'center'
-
     },
-    tophistory: {
 
-        alignItems: 'center',
-        marginBottom: '5',
-        flexDirection: 'row',
-        justifyContent: 'center',
-        paddingTop: 5
-
-    },
     content: {
         flex: 1,
-        paddingTop: 20,
-
-
+        paddingTop: 20
     },
+
+    titleContainer: {
+        paddingLeft: 20,
+        paddingRight: 20,
+        borderRadius: 50
+    },
+
+    title: {
+        fontSize: 50,
+        fontWeight: 'bold',
+        color: colors.red
+    },
+
     table: {
-
-        width: 50,
-        height: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.red,
-        borderColor: colors.red,
-        borderWidth: 2,
-        borderRadius: 30
-    },
-    tablenull: {
-
-        width: 50,
-        height: 50,
+        width: '30%',
+        height: 60,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: colors.dim,
         borderColor: colors.red,
         borderWidth: 2,
-        borderRadius: 30
+        borderRadius: 30,
+        marginBottom: 20
     },
+
+    tablenull: {
+        width: '30%',
+        height: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.red,
+        borderColor: colors.red,
+        borderWidth: 2,
+        borderRadius: 50,
+        marginBottom: 20
+    },
+
     numtable: {
         fontSize: 30,
-        color: colors.text,
+        color: colors.text
     },
-    middle: {
 
+    middle: {
         justifyContent: 'space-around',
         flexDirection: 'row',
         paddingLeft: 20,
         paddingRight: 20,
         marginBottom: 30,
+        flexWrap: 'wrap'
     },
+
     statustable: {
         width: 250,
         marginBottom: 20,
-        boxShadow: '0 0 5px rgba(0,0,0,0.5)',
         backgroundColor: colors.text,
         borderRadius: 10,
-        padding: 5,
-
+        padding: 10
     },
-    title: {
-        fontSize: 50,
-        fontWeight: 'bold',
-        color: colors.red,
 
-
+    back: {
+        width: 50,
+        height: 50,
+        borderRadius: 25
     },
-    titlehistory: {
-        fontSize: 30,
-        fontWeight: 'bold',
-        color: colors.red,
-        width: 150,
-        textAlign: 'center',
-        lineHeight: 45,
-        padding: 5
 
-
-    },
     bottombar: {
-
         flexDirection: 'row',
         justifyContent: 'space-around',
         position: 'absolute',
-        bottom: 0
+        bottom: 0,
+        left: 0,
+        right: 0
     },
+
     page: {
         borderColor: colors.text,
         borderTopWidth: 2,
         borderWidth: 1,
-        flex: 4,
+        flex: 1,
         height: 70,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: colors.red,
-
-
+        backgroundColor: colors.red
     },
+
     titlepage: {
         color: colors.text,
         fontSize: 20,
-        fontWeight: 'bold',
+        fontWeight: 'bold'
+    },
 
-    },
-    back: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        position: 'absolute'
-    },
     boxdata: {
-        flexDirection: 'column'
+        flexDirection: 'column',
+        marginBottom: 5
     },
+
     box: {
         backgroundColor: colors.text,
         borderRadius: 20,
-        boxShadow: '0 0 5px rgba(0,0,0,0.5)',
         paddingLeft: 20,
         paddingRight: 20,
-        marginBottom: 10
+        marginBottom: 10,
+        minHeight: 45
     },
+
     contentopen: {
         padding: 20
     },
+
     bottomopen: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
         padding: 20
-
     },
+
     butopen: {
         backgroundColor: colors.red,
         padding: 10,
         borderRadius: 5,
         marginLeft: 15
     },
+
     textbut: {
         color: colors.text,
         fontSize: 15
     },
+
     textopen: {
         fontSize: 15,
         fontWeight: 'bold',
-
+        marginBottom: 5
     },
-    bottomopendata: {
 
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-
-
-    }
-    ,
-    bottomopendata1: {
-        flexDirection: 'row',
-        borderColor: colors.text,
-        borderWidth: 2
-
+    billPageTitle: {
+        fontSize: 25,
+        fontWeight: 'bold',
+        color: colors.red,
+        marginBottom: 20
     },
-    bottomopendata2: {
-        flexDirection: 'row',
-        borderColor: colors.text,
-        borderWidth: 2,
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
 
-    },
-    butswitch: {
-        backgroundColor: colors.red,
-        flex: 1,
-        padding: 20,
-        borderColor: colors.text,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRightWidth: 2,
-
-
-    },
-    textswitch: {
-        fontSize: 15,
-        color: colors.text,
-        fontWeight: 'bold'
-    },
-    bottomoption: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end'
-    },
-    boxmove: {
+    infoText: {
         backgroundColor: colors.text,
         borderRadius: 20,
-        boxShadow: '0 0 5px rgba(0,0,0,0.5)',
-        paddingLeft: 20,
-        paddingRight: 20,
+        padding: 15,
         marginBottom: 10,
-        width: 150
-    },
-    movetable: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start'
-    },
-    butmove: {
-        backgroundColor: colors.red,
-        padding: 10,
-        borderRadius: 5,
-        marginRight: 15,
-
-    },
-    optionmove: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    areaedit: {
-        alignItems: 'flex-end'
-    },
-    butmovetable: {
-        backgroundColor: colors.red,
-        padding: 7,
-        borderRadius: 5,
-        marginRight: 15,
-
-    },
-    butmoveedit: {
-        backgroundColor: colors.red,
-        padding: 7,
-        borderRadius: 5,
-        marginRight: 15,
-
-    },
-    butmoveedit2: {
-        backgroundColor: 'rgb(135, 84, 180)',
-        padding: 7,
-        borderRadius: 5,
-        marginRight: 15,
-
-    },
-    butmovetable2: {
-        backgroundColor: 'rgb(135, 84, 180)',
-        padding: 7,
-        borderRadius: 5,
-        marginRight: 15,
-
-    },
-    middlehistory: {
-        paddingLeft: 20,
-        paddingRight: 20,
-        paddingBottom: 20,
-
-
-    },
-    order: {
-        justifyContent: 'center',
-        marginTop: 20,
-        backgroundColor: 'white',
-        boxShadow: '0 0 10px rgba(0,0,0,0.5)',
-        borderRadius: 15,
-        padding: 15
-    },
-    rownotable: {
-        borderBottomColor: colors.bg,
-        borderBottomWidth: 1,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-    },
-    notable: {
         fontSize: 18
     },
-    numround: {
-        fontSize: 14,
-        color: colors.dim
-    },
 
-    areabill: {
-        paddingLeft: 20,
-        paddingRight: 20
-    },
-    columnbill: {
-        width: 50
-    },
-    rowtitlebill: {
-        alignItems: 'center',
-        marginBottom: '15'
-    },
-    bill: {
-        marginBottom: 10
-    },
-    summarybill: {
-        alignItems: 'flex-end',
-        paddingRight: 15
-    },
-    list: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingTop: 5
-
-    },
-    summary: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        borderColor: colors.dim,
-        borderTopWidth: 1,
-        marginTop: 5,
-        paddingTop: 5
-    },
-    columnname1: {
-        width: 100,
-        color: colors.red,
-        textAlign: 'center'
-    },
-    columnname2: {
-        width: 70,
-        color: colors.red,
-        textAlign: 'center'
-    }
-    ,
-    columnname3: {
-        width: 60,
-        color: colors.red,
-        textAlign: 'center'
-    },
-    columnname4: {
-        flex: 1,
-        color: colors.red,
+    noBillText: {
+        fontSize: 18,
         textAlign: 'center',
-
+        marginTop: 30
     },
-    columndata: {
-        flexDirection: 'row',
-        borderColor: colors.dim,
-        borderBottomWidth: 1,
-        justifyContent: 'space-between',
-        borderTopWidth: 1,
 
-    },
-    bottompay: {
-        backgroundColor: colors.text,
-        boxShadow: '0 0 7px rgba(0,0,0,0.5)',
-        padding: 10
-
-
-    },
-    allbill: {
-
-
+    billcode: {
+        flex: 1,
         alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'center'
-
-
-
+        justifyContent: 'center',
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        margin: 20,
+        borderRadius: 20,
+        padding: 30
     },
-    pay: {
-        fontSize: 20,
-        color: colors.text
-    },
-    paytext: {
-        fontSize: 21,
+
+    billcodetitle: {
+        fontSize: 30,
         fontWeight: 'bold',
-        marginRight: 10
+        color: colors.red,
+        marginBottom: 30
+    },
 
-    },
-    butpay: {
-        backgroundColor: 'rgb(135, 84, 180)',
-        borderRadius: 10,
-        padding: 10
-
-    },
-    columnbill: {
-        width: 50
-    },
-    rowtitlebill: {
-        alignItems: 'center',
-        marginBottom: '15'
-    },
-    bill: {
-        marginBottom: 10
-    },
-    summarybill: {
-        alignItems: 'flex-end',
-        paddingRight: 15
-    },
-    allbill: {
+    billcodename: {
         fontSize: 20,
-        fontWeight: 'bold',
-        flexDirection:'row',
-        alignItems:'center'
+        fontWeight: 'bold'
+    },
 
+    billid: {
+        fontSize: 50,
+        fontWeight: 'bold',
+        color: colors.red,
+        marginVertical: 20
     },
-    middlebill: {
-        paddingLeft: 20,
-        paddingRight: 20,
-        
-    },
-    rowbutbill:{
-        flexDirection:'row',
-        justifyContent:'flex-end'
-    },
-    bottombill:{
-        padding:25
-    },
-    butbill1:{
-        backgroundColor:colors.red,
-        padding:8,
-        borderRadius:7,
-        marginRight:10
-    },
-    butbill2:{
-        backgroundColor:'rgb(135, 84, 180)',
-        padding:8,
-        borderRadius:7,
-        marginRight:10
-    },
-    textbutbill:{
-        color:colors.text,
-        fontSize:15
+
+    billcodeinfo: {
+        fontSize: 16,
+        marginBottom: 5
     }
-
-
 })
-
-
 
 export default TableMap

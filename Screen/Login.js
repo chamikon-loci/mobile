@@ -5,12 +5,19 @@ import { useState } from 'react';
 
 
 function Login({changepage}) {
+    const empPassword = '1' 
+    const [password, setPassword] = useState('')
+
     const [tab,settab] = useState('client')
     const screen=()=>{
         if(tab==='client'){
             console.log('client')
         }else{
-            changepage('TableMap');
+            if(password === empPassword) {
+                changepage('TableMap');
+                console.log('เข้าสู่ระบบร้านสำเร็จ')
+            } else
+                console.log('รหัสไม่ถูกต้อง')
         }
     }
     return (
@@ -23,7 +30,10 @@ function Login({changepage}) {
                 
             </View >
             <View style={{marginTop:30 ,alignItems:'center'}}>
-                <TextInput style={styles.input} placeholder={tab==='client'?'รหัสโต๊ะ':'รหัสเข้าสู่ระบบร้าน'}/>
+                <TextInput style={styles.input} placeholder={tab==='client'?'รหัสโต๊ะ':'รหัสเข้าสู่ระบบร้าน'}
+                    value={password}
+                    onChangeText={(e) => setPassword(e)}
+                />
                 <TouchableOpacity style={styles.confirm} onPress={()=>{screen()}}>
                     <Text style={{color:colors.red,fontSize:15}}>ยืนยัน</Text>
                 </TouchableOpacity>

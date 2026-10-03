@@ -1,14 +1,100 @@
 import { View, StyleSheet, TouchableOpacity, Image, Text, ImageBackground, ScrollView, TextInput } from "react-native"
 import { colors } from "../src/style/theme"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { SQLiteProvider, useSQLiteContext } from "expo-sqlite"
+import { DATABASE_NAME, getBillHistory, openDATABASE, getDailySales, getBestSellingMenus } from "../database/db"
 
+function Account({changepage}) {
+  return (
+    <SQLiteProvider onInit={openDATABASE} databaseName={DATABASE_NAME}>
+      <AccountScreen changepage={changepage}/>
+    </SQLiteProvider>
+  )
+}
 
-function Account({ changepage }) {
+function AccountScreen({ changepage }) {
+
+  const db = useSQLiteContext()
+
+  const [day, setDay] = useState('')
+  const [month, setMonth] = useState('')
+  const [year, setYear] = useState('')
+
+  const [dailySales, setDailySales] = useState([])
+  const [rankSales, setRankSales] = useState([])
+  const [billHistory, setBillHistory] = useState([])
+
+  async function searchBill() {
+    const date = turnIntoDate()
+
+    if(!date) {
+      console.log('กรุณากรอกวันที่ให้ถูกต้อง')
+      return
+    }
+
+    try {
+      const result = await getBillHistory(db, date)
+      setBillHistory(result)
+    } catch (error) {
+      console.log('ค้นหาข้อมูลประวัติบิลไม่ได้') 
+    }
+  }
+
+  function turnIntoDate() {
+    if(!day || !month || !year) 
+      return null
+
+    let y = Number(year)
+    let m = Number(month)
+    let d = Number(day)
+
+    if (y > 2400) {
+      y -= 543
+    }
+
+    if(d < 1 || d > 31 || m < 1 || m > 12)
+      return null
+
+    return `${y}-${m}-${d}`
+  }
+
+  async function searchDaily() {
+      const date = turnIntoDate()
+      if (!date) {
+          console.log("กรุณากรอกวันที่ให้ถูกต้อง")
+          return
+      }
+      try {
+          const result = await getDailySales(db, date)
+          setDailySales(result)
+          setdatadaily('datadaily')
+          console.log('ผลการค้นหายอดขายรายวัน', result)
+      } catch (error) {
+          console.log("โหลดข้อมูลยอดขายไม่สำเร็จ")
+      }
+  }
+
+  async function searchRank() {
+      try {
+          const result = await getBestSellingMenus(db)
+          setRankSales(result)
+          console.log('ผลการค้นหาอันดับเมนูขายดี', result)
+      } catch (error) {
+          console.log("โหลดอันดับเมนูไม่สำเร็จ")
+      }
+  }
+
+  useEffect(() => {
+    searchRank()
+  }, [])
+
+  const totalQuantity = dailySales.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+  const totalPrice = dailySales.reduce((sum, item) => sum + Number(item.total_price || 0), 0)
 
   const [tab, settab] = useState('daily');
   const [datadaily, setdatadaily] = useState('empty');
-  return (
 
+  return (
     <ImageBackground source={require('../photo/res.avif')} style={styles.content}>
       <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => { changepage('Login') }}>
         <Image source={require('../photo/back.png')} style={styles.picback} ></Image>
@@ -44,25 +130,42 @@ function Account({ changepage }) {
                     </View>
                     <View style={styles.day}>
                       <Text style={styles.topic}>วันที่</Text>
-                      <TextInput style={styles.input} placeholder="วันที่ เช่น 02 , 23"></TextInput>
+                      <TextInput
+                          style={styles.input}
+                          placeholder="เช่น 02"
+                          keyboardType="numeric"
+                          value={day}
+                          onChangeText={setDay}
+                      />
                       <Text style={styles.topic}>เดือน</Text>
-                      <TextInput style={styles.input} placeholder="เดือน เช่น 12 , 05"></TextInput>
+                      <TextInput
+                          style={styles.input}
+                          placeholder="เช่น 05"
+                          keyboardType="numeric"
+                          value={month}
+                          onChangeText={setMonth}
+                      />
 
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                         <View style={{ flexDirection: 'column' }}>
                           <Text style={styles.topic}>ปี</Text>
-                          <TextInput style={styles.input} placeholder="ปี เช่น 2569 , 2568"></TextInput>
+                          <TextInput
+                                style={styles.input}
+                                placeholder="เช่น 2569"
+                                keyboardType="numeric"
+                                value={year}
+                                onChangeText={setYear}
+                            />
                         </View>
-                        <TouchableOpacity style={styles.butt} onPress={() => setdatadaily('datadaily')}>
+                        <TouchableOpacity style={styles.butt} onPress={() => searchDaily()}>
                           <Text style={styles.search}>ค้นหา</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
                   </View>
 
-                  {datadaily === 'datadaily' ? 
-
-                      <View style={styles.contentdata}>
+                  {datadaily === 'datadaily' ? (
+                    <View style={styles.contentdata}>
                       <View style={styles.framedata2}>
                         <View style={styles.topdata}>
                           <Text style={styles.titledata}>รายได้ทั้งหมด</Text>
@@ -76,72 +179,34 @@ function Account({ changepage }) {
                             <Text style={styles.columnname4}>ราคารวม</Text>
                           </View>
 
-
                           <View style={styles.listfood}>
-                            <View style={styles.list}>
-                              <Text style={styles.columnname1}>Cake</Text>
-                              <Text style={styles.columnname2}>100</Text>
-                              <Text style={styles.columnname3}>2</Text>
-                              <Text style={styles.columnname4}>200</Text>
-                            </View>
-
-                            <View style={styles.list}>
-                              <Text style={styles.columnname1}>Cake</Text>
-                              <Text style={styles.columnname2}>100</Text>
-                              <Text style={styles.columnname3}>2</Text>
-                              <Text style={styles.columnname4}>200</Text>
-                            </View>
-
-                            <View style={styles.list}>
-                              <Text style={styles.columnname1}>Cake</Text>
-                              <Text style={styles.columnname2}>100</Text>
-                              <Text style={styles.columnname3}>2</Text>
-                              <Text style={styles.columnname4}>200</Text>
-                            </View>
-
-                            <View style={styles.list}>
-                              <Text style={styles.columnname1}>Cake</Text>
-                              <Text style={styles.columnname2}>100</Text>
-                              <Text style={styles.columnname3}>2</Text>
-                              <Text style={styles.columnname4}>200</Text>
-                            </View>
-
-
-                            <View style={styles.list}>
-                              <Text style={styles.columnname1}>Cake</Text>
-                              <Text style={styles.columnname2}>100</Text>
-                              <Text style={styles.columnname3}>2</Text>
-                              <Text style={styles.columnname4}>200</Text>
-                            </View>
-
+                            {dailySales.map((item, index) => (
+                              <View style={styles.list} key={index}>
+                                <Text style={styles.columnname1}>{item.menu_name}</Text>
+                                <Text style={styles.columnname2}>{Number(item.unit_price).toFixed(2)}</Text>
+                                <Text style={styles.columnname3}>{item.quantity}</Text>
+                                <Text style={styles.columnname4}>{Number(item.total_price).toFixed(2)}</Text>
+                              </View>
+                            ))}
 
                             <View style={styles.summary}>
                               <Text style={styles.columnname1}>รวมทั้งหมด</Text>
-                              <Text style={styles.columnname2}></Text>
-                              <Text style={styles.columnname3}>10</Text>
-                              <Text style={styles.columnname4}>1000</Text>
+                              <Text style={styles.columnname2}>-</Text>
+                              <Text style={styles.columnname3}>{totalQuantity}</Text>
+                              <Text style={styles.columnname4}>{totalPrice.toFixed(2)}</Text>
                             </View>
                           </View>
                         </View>
                       </View>
                     </View>
-
-
-
-                    
-
-                  :  (
-                  <View style={styles.contentdata}>
-                    <View style={styles.framedata}>
-                      <Text style={{ color: colors.red, fontSize: 20 }}>ยังไม่มีข้อมูล</Text>
+                  ) : (
+                    <View style={styles.contentdata}>
+                      <View style={styles.framedata}>
+                        <Text style={{ color: colors.red, fontSize: 20 }}>ยังไม่มีข้อมูล</Text>
+                      </View>
                     </View>
-                  </View>   
                   )}
-
                 </View>
-
-
-
               </View>
             </ScrollView>
 
@@ -153,100 +218,49 @@ function Account({ changepage }) {
                   </View>
 
                   <View style={styles.contentrank}>
-                    <View style={styles.framerank}>
-
-                      <View style={styles.picrank}>
-                        <Image source={require('../photo/cate.jpg')} style={styles.pic}></Image>
-                      </View>
-
-                      <View style={styles.datarank}>
-                        <View style={styles.rowrank}>
-                          <Text style={styles.rank}>อันดับ 1</Text>
+                    {rankSales.length > 0 ? (
+                      <View style={styles.framerank}>
+                        <View style={styles.picrank}>
+                          <Image source={require('../photo/cate.jpg')} style={styles.pic} />
                         </View>
 
-                        <View style={styles.namedata}><Text>Name : </Text>
-                          <TextInput style={styles.namefood}>Cake</TextInput>
-                        </View>
+                        <View style={styles.datarank}>
+                          {rankSales.map((item, index) => (
+                            <View key={item.menu_id}>
+                              <Text style={styles.rank}>อันดับ {index + 1}</Text>
 
+                              <View>
+                                <Text>Name :</Text>
+                                <Text style={styles.datafood}>{item.menu_name}</Text>
 
-                        <View style={styles.namedata}><Text>Price : </Text>
-                          <TextInput style={styles.datafood}>100</TextInput>
-                        </View>
+                                <View>
+                                  <Text>Price :</Text>
+                                  <Text style={styles.datafood}>{item.unit_price}</Text>
+                                </View>
 
+                                <View>
+                                  <Text>ขาย :</Text>
+                                  <Text style={styles.datafood}>{item.quantity} รายการ</Text>
+                                </View>
 
-                        <View style={styles.namedata}><Text>Promotion : </Text>
-                          <TextInput style={styles.datafood}>none</TextInput>
-                        </View>
-                      </View>
-                    </View>
-
-
-
-
-                    <View style={styles.framerank}>
-
-                      <View style={styles.picrank}>
-                        <Image source={require('../photo/cate.jpg')} style={styles.pic}></Image>
-                      </View>
-
-                      <View style={styles.datarank}>
-                        <View style={styles.rowrank}>
-                          <Text style={styles.rank}>อันดับ 2</Text>
-                        </View>
-
-                        <View style={styles.namedata}><Text>Name : </Text>
-                          <TextInput style={styles.namefood}>Cake</TextInput>
-                        </View>
-
-
-                        <View style={styles.namedata}><Text>Price : </Text>
-                          <TextInput style={styles.datafood}>100</TextInput>
-                        </View>
-
-
-                        <View style={styles.namedata}><Text>Promotion : </Text>
-                          <TextInput style={styles.datafood}>none</TextInput>
+                                <View>
+                                  <Text>ยอดขาย :</Text>
+                                  <Text style={styles.datafood}>{item.total_price}</Text>
+                                </View>
+                              </View>
+                            </View>
+                          ))}
                         </View>
                       </View>
-                    </View>
-
-
-
-                    <View style={styles.framerank}>
-
-                      <View style={styles.picrank}>
-                        <Image source={require('../photo/cate.jpg')} style={styles.pic}></Image>
+                    ) : (
+                      <View style={styles.noData}>
+                        <Text style={styles.noDataText}>ไม่มีข้อมูล</Text>
                       </View>
-
-                      <View style={styles.datarank}>
-                        <View style={styles.rowrank}>
-                          <Text style={styles.rank}>อันดับ 3</Text>
-                        </View>
-
-                        <View style={styles.namedata}><Text>Name : </Text>
-                          <TextInput style={styles.namefood}>Cake</TextInput>
-                        </View>
-
-
-                        <View style={styles.namedata}><Text>Price : </Text>
-                          <TextInput style={styles.datafood}>100</TextInput>
-                        </View>
-
-
-                        <View style={styles.namedata}><Text>Promotion : </Text>
-                          <TextInput style={styles.datafood}>none</TextInput>
-                        </View>
-                      </View>
-                    </View>
+                    )}
                   </View>
                 </ScrollView>
-
-
               </View>
-
-
               :
-
               <View>
                 <ScrollView contentContainerStyle={{ paddingBottom: 90 }}>
                   <View style={styles.topdaily}>
@@ -268,7 +282,7 @@ function Account({ changepage }) {
                           <View style={{ flexDirection: 'column' }}>
                             <Text style={styles.topic}>วันที่</Text>
 
-                            <TextInput style={styles.input} placeholder="วันที่ เช่น 02 , 23"></TextInput>
+                            <TextInput style={styles.input} placeholder="วันที่ เช่น 02 , 23" keyboardType="numeric" value={day} onChangeText={setDay}/>
                           </View>
 
 
@@ -281,155 +295,94 @@ function Account({ changepage }) {
 
 
                         <Text style={styles.topic}>เดือน</Text>
-                        <TextInput style={styles.input} placeholder="เดือน เช่น 12 , 05"></TextInput>
-
+                        <TextInput style={styles.input} placeholder="เดือน เช่น 12 , 05" keyboardType="numeric" value={month} onChangeText={setMonth}/>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                           <View style={{ flexDirection: 'column' }}>
                             <Text style={styles.topic}>ปี</Text>
-                            <TextInput style={styles.input} placeholder="ปี เช่น 2569 , 2568"></TextInput>
+                            <TextInput style={styles.input} placeholder="ปี เช่น 2569 , 2568" keyboardType="numeric" value={year} onChangeText={setYear}/>
                           </View>
-                          <TouchableOpacity style={styles.butt} onPress={() => setdatadaily('bill')}>
+                          <TouchableOpacity style={styles.butt} onPress={() => searchBill()}>
                             <Text style={styles.search}>ค้นหา</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
                     </View>
 
-                    {datadaily === 'bill' ? 
+                    {billHistory.length > 0 ? 
                       <View style={styles.areabill}>
 
                         <View style={styles.order}>
 
+                          <View style={styles.areabill}>
+                            {billHistory.map((item, index) => (
+                              <View style={styles.order} key={index}>
+                                <View style={styles.rowtitlebill}>
+                                  <Text style={{ fontSize: 25 }}>Bill</Text>
+                                  <Text style={styles.numbill}>
+                                    รหัสบิล : {item.bill_id}
+                                  </Text>
+                                  <Text style={styles.numbill}>
+                                    โต๊ะ : {item.table_name}
+                                  </Text>
+                                  <Text style={styles.numbill}>
+                                    เวลาเปิด : {item.open_at}
+                                  </Text>
+                                  <Text style={styles.numbill}>
+                                    เวลาปิด : {item.close_at || '-'}
+                                  </Text>
+                                </View>
 
-                          <View style={styles.rowtitlebill}>
-                            <Text style={{ fontSize: 25 }}>Bill</Text>
-                            <Text style={styles.numbill}>รหัสบิล :  789124345</Text>
+                                <View style={styles.bill}>
+                                  <View style={styles.columndata}>
+                                    <Text style={styles.columnname1}>รายการอาหาร</Text>
+                                    <Text style={styles.columnname2}>ราคา</Text>
+                                    <Text style={styles.columnname3}>จำนวน</Text>
+                                    <Text style={styles.columnname4}>ราคารวม</Text>
+                                  </View>
 
-                            <Text style={styles.numbill}>วัน/เดือน/ปี : 29/09/2569 เวลา : 16.00</Text>
+                                  <View style={styles.listfood}>
+                                    <View style={styles.list}>
+                                      <Text style={styles.columnname1}>
+                                        {item.menu_name}
+                                      </Text>
 
+                                      <Text style={styles.columnname2}>
+                                        {Number(item.unit_price).toFixed(2)}
+                                      </Text>
+
+                                      <Text style={styles.columnname3}>
+                                        {item.amount}
+                                      </Text>
+
+                                      <Text style={styles.columnname4}>
+                                        {(Number(item.unit_price) * Number(item.amount)).toFixed(2)}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                </View>
+                            <View style={styles.summarybill}>
+                              <Text style={styles.allbill}>
+                                รวม : {(Number(item.unit_price) * Number(item.amount)).toFixed(2)}
+                              </Text>
+                            </View>
                           </View>
-                          <View style={styles.bill}>
-                            <View style={styles.rownotable}>
-                              <Text style={styles.notable}>โต๊ะที่ 1</Text>
-                              <Text style={styles.numround}>รอบที่ 1 เวลา : 15.00</Text>
-                            </View>
-
-                            <View style={styles.columndata}>
-                              <Text style={styles.columnname1}>รายการอาหาร</Text>
-                              <Text style={styles.columnname2}>ราคา</Text>
-                              <Text style={styles.columnname3}>จำนวน</Text>
-                              <Text style={styles.columnname4}>ราคารวม</Text>
-                            </View>
-
-                            <View style={styles.listfood}>
-                              <View style={styles.list}>
-                                <Text style={styles.columnname1}>Cake</Text>
-                                <Text style={styles.columnname2}>100</Text>
-                                <Text style={styles.columnname3}>2</Text>
-                                <Text style={styles.columnname4}>200</Text>
-                              </View>
-
-                              <View style={styles.list}>
-                                <Text style={styles.columnname1}>Cake</Text>
-                                <Text style={styles.columnname2}>100</Text>
-                                <Text style={styles.columnname3}>2</Text>
-                                <Text style={styles.columnname4}>200</Text>
-                              </View>
-
-
-                              <View style={styles.summary}>
-                                <Text style={styles.columnname1}>รวมทั้งหมด</Text>
-                                <Text style={styles.columnname2}></Text>
-                                <Text style={styles.columnname3}>4</Text>
-                                <Text style={styles.columnname4}>400</Text>
-                              </View>
-                            </View>
-
-                          </View>
-
-
-                          <View style={styles.bill}>
-                            <View style={styles.rownotable}>
-                              <Text style={styles.notable}>โต๊ะที่ 1</Text>
-                              <Text style={styles.numround}>รอบที่ 2 เวลา : 15.40</Text>
-                            </View>
-
-                            <View style={styles.columndata}>
-                              <Text style={styles.columnname1}>รายการอาหาร</Text>
-                              <Text style={styles.columnname2}>ราคา</Text>
-                              <Text style={styles.columnname3}>จำนวน</Text>
-                              <Text style={styles.columnname4}>ราคารวม</Text>
-                            </View>
-
-                            <View style={styles.listfood}>
-                              <View style={styles.list}>
-                                <Text style={styles.columnname1}>Cake</Text>
-                                <Text style={styles.columnname2}>100</Text>
-                                <Text style={styles.columnname3}>2</Text>
-                                <Text style={styles.columnname4}>200</Text>
-                              </View>
-
-                              <View style={styles.list}>
-                                <Text style={styles.columnname1}>Cake</Text>
-                                <Text style={styles.columnname2}>100</Text>
-                                <Text style={styles.columnname3}>2</Text>
-                                <Text style={styles.columnname4}>200</Text>
-                              </View>
-
-
-                              <View style={styles.summary}>
-                                <Text style={styles.columnname1}>รวมทั้งหมด</Text>
-                                <Text style={styles.columnname2}></Text>
-                                <Text style={styles.columnname3}>4</Text>
-                                <Text style={styles.columnname4}>400</Text>
-                              </View>
-                            </View>
-
-                          </View>
-
-
-                          <View style={styles.summarybill}>
-                                    <Text style={styles.allbill}>ยอดรวมทั้งหมด : 400</Text>
-                            </View>
-                        </View>
-
-
-                        
-
-
-
-
+                        ))}
                       </View>
-                    
+                        </View>
+                      </View>
                     : (
-
                       <View style={styles.contentdata}>
 
                       <View style={styles.framedata}>
                         <Text style={{ color: colors.red, fontSize: 20 }}>ยังไม่มีข้อมูล</Text>
                       </View>
-
                     </View>
-
-
-                      
                     )}
-
                   </View>
-
-
                 </ScrollView>
               </View>
-
-
           }
-
         </View>
-
-
-
-
-
       </View>
 
       <View style={styles.bottombar}>
@@ -775,6 +728,17 @@ const styles = StyleSheet.create({
     fontSize:20,
     fontWeight:'bold',
     
+  },
+  noData: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noDataText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 100,
   }
 
 })

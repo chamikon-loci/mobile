@@ -5,7 +5,7 @@ export const colors = {
   card: "#f26725",
   border: "#86112e",
   title: "#0e1a1d",
-  text: "#000000",
+  text: "#ffffff",
   dim: "#8B949E",
   cyan: "#61DAFB",
   green: "#3FB950",

@@ -1,11 +1,132 @@
 import { View, StyleSheet, TouchableOpacity, Image, Text, ImageBackground, ScrollView, TextInput } from "react-native"
 import { colors } from "../src/style/theme"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { SQLiteProvider, useSQLiteContext } from "expo-sqlite"
+import { DATABASE_NAME, getAllMenu, saveMenu, addMenu, openDATABASE, getAllCategories, addCategory, deleteCategory, deleteMenu } from "../database/db"
 
+function Menu({changepage}) {
+  return (
+    <SQLiteProvider onInit={openDATABASE} databaseName={DATABASE_NAME}>
+      <MenuScreen changepage={changepage}/>
+    </SQLiteProvider>
+  )
+}
 
-function Menu({ changepage }) {
+function MenuScreen({ changepage }) {
   const [open,setopen]=useState('เปิดการขาย')
   const [tabfood, settabfood] = useState('listfood');
+
+  const db = useSQLiteContext()
+  const [menu, setMenu] = useState([])
+  const [categories, setCategories] = useState([])
+
+  async function loadMenu() {
+    try {
+      const data = await getAllMenu(db)
+      setMenu(data)
+    } catch (error) {
+      console.log('ไม่สามารถโหลดข้อมูลเมนูได้')
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const data = await getAllCategories(db)
+      setCategories(data)
+    } catch (error) {
+      console.log('โหลดหมวดหมู่ไม่สำเร็จ')
+    }
+  }
+
+
+  useEffect(() => {
+    loadMenu()
+    loadCategories()
+  }, [])
+  
+  const [editMenu, setEditMenu] = useState(null)
+  const [menuName, setMenuName] = useState('')
+  const [menuPrice, setMenuPrice] = useState('')
+  const [categoryId, setCategoryId] = useState(null)
+  const [categoryName, setCategoryName] = useState('')
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
+
+  async function AddCategory() {
+    if (!categoryName.trim()) {
+      return
+    }
+
+    try {
+      await addCategory(db, categoryName.trim())
+      await loadCategories()
+      setCategoryName('')
+      settabfood('listfood')
+    } catch (error) {
+      console.log('เพิ่มหมวดหมู่ไม่สำเร็จ')
+    }
+  }
+
+   async function saveEdit() {
+    if (!editMenu) return
+
+    if (!menuName.trim() || !menuPrice.trim()) {
+      return
+    }
+
+    try {
+      await saveMenu(db, editMenu.menu_id,menuName.trim(), Number(menuPrice), editMenu.category_id)
+      await loadMenu()
+      setEditMenu(null)
+      setMenuName('')
+      setMenuPrice('')
+      settabfood('listfood')
+    } catch (error) {
+      console.log('แก้ไขเมนูไม่สำเร็จ')
+    }
+  }
+
+  const [addName, setAddName] = useState('')
+  const [addPrice, setAddPrice] = useState('')
+  const [addCategoryId, setAddCategoryId] = useState(null)
+
+  async function saveAddMenu() {
+    if (!addName.trim() || !addPrice.trim() || !addCategoryId) {
+      console.log('เติมข้อมูลไม่ครบ')
+      return
+    }
+
+    try {
+      await addMenu(db, addName.trim(), Number(addPrice),addCategoryId)
+      await loadMenu()
+
+      setAddName('')
+      setAddPrice('')
+      setAddCategoryId(null)
+      setShowCategoryDropdown(false)
+      settabfood('listfood')
+    } catch (error) {
+      console.log('เพิ่มเมนูไม่สำเร็จ')
+    }
+  }
+
+  async function DeleteMenu(menuId) {
+    try {
+      await deleteMenu(db, menuId)
+      await loadMenu()
+    } catch (error) {
+      console.log('ลบเมนูไม่สำเร็จ')
+    }
+  }
+
+  async function DeleteCategory(categoryId) {
+    try {
+      await deleteCategory(db, categoryId)
+      await loadCategories()
+    } catch (error) {
+      console.log('ลบหมวดหมู่ไม่สำเร็จ')
+    }
+  }
+
   return (
 
     <ImageBackground source={require('../photo/order.jpg')} style={styles.content}>
@@ -13,19 +134,37 @@ function Menu({ changepage }) {
         <Image source={require('../photo/back.png')} style={styles.picback} ></Image>
       </TouchableOpacity>
       <View style={styles.top}>
-        <View style={{ boxShadow: '0 0 10px rgba(0,0,0,0.5)', paddingLeft: 20, paddingRight: 20, borderRadius: 50 }}>
+        <View style={{ boxShadow: '0 0 10px rgba(255, 241, 241, 0.5)', paddingLeft: 20, paddingRight: 20, borderRadius: 50 }}>
           <Text style={styles.title}>Menu</Text>
         </View>
       </View>
       <View style={styles.table}>
 
         <View style={styles.column}>
-          <ScrollView horizontal={true} showsHorizontalScrollIndicator={false}>
-            <TouchableOpacity style={styles.category}><Text style={styles.categoryname} onPress={()=>{settabfood('addcategory')}}>+ หมวดหมู่อาหาร</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.category} onPress={() => { settabfood('listfood') }}><Text style={styles.categoryname}>Appetizer</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.category}><Text style={styles.categoryname} onPress={() => { settabfood('listfood') }}>Maincourse</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.category}><Text style={styles.categoryname} onPress={() => { settabfood('listfood') }}>Dessert</Text></TouchableOpacity>
-            <TouchableOpacity style={styles.category}><Text style={styles.categoryname} onPress={() => { settabfood('listfood') }}>Drinks</Text></TouchableOpacity>
+          <ScrollView horizontal>
+          <TouchableOpacity style={styles.category} onPress={() => settabfood('addcategory')}>
+            <Text style={styles.categoryname}>+ หมวดหมู่อาหาร</Text>
+          </TouchableOpacity>
+            {categories.map(category => (
+              <View key={category.category_id} style={styles.categoryItem}>
+                <TouchableOpacity
+                  style={[
+                    styles.categoryButton,
+                    addCategoryId === category.category_id && styles.categoryButtonActive
+                  ]}
+                  onPress={() => setAddCategoryId(category.category_id)}
+                >
+                  <Text>{category.category_name}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteCategory}
+                  onPress={() => DeleteCategory(category.category_id)}
+                >
+                  <Text style={styles.deleteCategoryText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
           </ScrollView>
         </View>
 
@@ -41,202 +180,179 @@ function Menu({ changepage }) {
                 </TouchableOpacity>
               </View>
               <View style={styles.listfood}>
-                <View style={styles.card}>
-                  <Image source={require('../photo/OIP.webp')} style={styles.picfood}></Image>
-                  <View style={styles.data}>
+                {menu.length > 0 ? (menu.map(item => (
+                    <View style={styles.card} key={item.menu_id}>
+                      <Image source={require('../photo/OIP.webp')} style={styles.picfood}></Image>
+                      <View style={styles.data}>
 
-                    <View style={styles.namedata}><Text>Name : </Text>
-                      <TextInput style={styles.namefood}>Cake</TextInput>
+                        <View style={styles.namedata}><Text>Name : </Text>
+                          <TextInput style={styles.namefood}>{item.menu_name}</TextInput>
+                        </View>
+
+
+                        <View style={styles.namedata}><Text>Price : </Text>
+                          <TextInput style={styles.datafood}>{item.unit_price}</TextInput>
+                        </View>
+
+                        <View style={styles.namedata}>
+                          <Text>Category : </Text>
+                          <Text style={styles.datafood}>{item.category_name || '-'}</Text>
+                        </View>
+
+                        <View style={styles.namedata}><Text>Promotion : </Text>
+                          <TextInput style={styles.datafood}>none</TextInput>
+                        </View>
+                        <Text>สถานะ : {open}</Text>
+                        <View style={styles.option}>
+                          <TouchableOpacity style={styles.fix} onPress={()=>{setopen(open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย')}}>
+                            <Text style={{ color: colors.text }}>{open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย'}</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity style={styles.fix} onPress={() => DeleteMenu(item.menu_id)}>
+                            <Text style={{color: colors.text}}>Delete</Text>
+                          </TouchableOpacity>
+                          
+
+                        </View>
+                          <TouchableOpacity
+                            style={styles.edit}
+                            onPress={() => {
+                              setEditMenu(item)
+                              setMenuName(item.menu_name)
+                              setMenuPrice(String(item.unit_price))
+                              setCategoryId(item.category_id)
+                              settabfood('editfood')
+                            }}
+                          >
+                            <Text style={{ color: colors.text }}>Edit</Text>
+                          </TouchableOpacity>
+                      </View>
                     </View>
-
-
-                    <View style={styles.namedata}><Text>Price : </Text>
-                      <TextInput style={styles.datafood}>100</TextInput>
-                    </View>
-
-
-                    <View style={styles.namedata}><Text>Promotion : </Text>
-                      <TextInput style={styles.datafood}>none</TextInput>
-                    </View>
-                    <Text>สถานะ : {open}</Text>
-                    <View style={styles.option}>
-                      <TouchableOpacity style={styles.fix} onPress={()=>{setopen(open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย')}}>
-                        <Text style={{ color: colors.text }}>{open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย'}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.fix}>
-                        <Text style={{ color: colors.text }}>Delete</Text>
-                      </TouchableOpacity>
-                      
-
-                    </View>
-                      <TouchableOpacity style={styles.edit}>
-                        <Text style={{ color: colors.text }}onPress={()=>{settabfood('editfood')}}>Edit</Text>
-                      </TouchableOpacity>
+                ))) : (
+                  <View style={styles.noData}>
+                    <Text style={styles.noDataText}>ไม่มีเมนู</Text>
                   </View>
-                </View>
-
-
-
-
-                <View style={styles.card}>
-                  <Image source={require('../photo/OIP.webp')} style={styles.picfood}></Image>
-                  <View style={styles.data}>
-
-                    <View style={styles.namedata}><Text>Name : </Text>
-                      <TextInput style={styles.namefood}>Cake</TextInput>
-                    </View>
-
-
-                    <View style={styles.namedata}><Text>Price : </Text>
-                      <TextInput style={styles.datafood}>100</TextInput>
-                    </View>
-
-
-                    <View style={styles.namedata}><Text>Promotion : </Text>
-                      <TextInput style={styles.datafood}>none</TextInput>
-                    </View>
-                    <Text>สถานะ : {open}</Text>
-                    <View style={styles.option}>
-                      <TouchableOpacity style={styles.fix} onPress={()=>{setopen(open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย')}}>
-                        <Text style={{ color: colors.text }}>{open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย'}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.fix}>
-                        <Text style={{ color: colors.text }}>Delete</Text>
-                      </TouchableOpacity>
-                      
-
-                    </View>
-                      <TouchableOpacity style={styles.edit}>
-                        <Text style={{ color: colors.text }}onPress={()=>{settabfood('editfood')}}>Edit</Text>
-                      </TouchableOpacity>
-                  </View>
-                </View>
-
-
-
-
-                <View style={styles.card}>
-                  <Image source={require('../photo/OIP.webp')} style={styles.picfood}></Image>
-                  <View style={styles.data}>
-
-                    <View style={styles.namedata}><Text>Name : </Text>
-                      <TextInput style={styles.namefood}>Cake</TextInput>
-                    </View>
-
-
-                    <View style={styles.namedata}><Text>Price : </Text>
-                      <TextInput style={styles.datafood}>100</TextInput>
-                    </View>
-
-
-                    <View style={styles.namedata}><Text>Promotion : </Text>
-                      <TextInput style={styles.datafood}>none</TextInput>
-                    </View>
-                    <Text>สถานะ : {open}</Text>
-                    <View style={styles.option}>
-                      <TouchableOpacity style={styles.fix} onPress={()=>{setopen(open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย')}}>
-                        <Text style={{ color: colors.text }}>{open==='เปิดการขาย'?'ปิดการขาย':'เปิดการขาย'}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.fix}>
-                        <Text style={{ color: colors.text }}>Delete</Text>
-                      </TouchableOpacity>
-                      
-
-                    </View>
-                      <TouchableOpacity style={styles.edit}>
-                        <Text style={{ color: colors.text }}onPress={()=>{settabfood('editfood')}}>Edit</Text>
-                      </TouchableOpacity>
-                  </View>
-                </View>
-
-
-
-
+                )}
               </View>
 
 
             </View>
           </ScrollView>) :tabfood==='editfood' ?
           (
-          <View style={styles.contentaddfood}>
-            <View style={styles.cardaddfood}>
-              <Image source={require('../photo/OIP.webp')} style={styles.picaddfood}></Image>
-            </View>
-            <View style={styles.dataaddfood}>
-            <View style={styles.bottomaddfood}>
-              <View style={styles.namedata}><Text>Name : </Text>
-                <TextInput style={styles.namefood}>Cake</TextInput>
-              </View>
-
-
-              <View style={styles.namedata}><Text>Price : </Text>
-                <TextInput style={styles.datafood}>100</TextInput>
-              </View>
-
-            <View style={styles.butt}>
-              <View style={styles.namedata}><Text>Promotion : </Text>
-                <TextInput style={styles.datafood}>none</TextInput>
-              </View>
-
-
-              <View style={styles.option}>
-                <TouchableOpacity style={styles.fix} onPress={()=>{settabfood('listfood')}}>
-                  <Text style={{ color: colors.text }} >ยกเลิก</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.fix1} onPress={()=>{settabfood('listfood')}}>
-                  <Text style={{ color: colors.text }}>เสร็จสิ้น</Text>
-                </TouchableOpacity>
-
-              </View>
-
-
-              
-            </View>
-            </View>
-            </View>
-
-
-          </View>): tabfood==='addfood'?
-          (
             <View style={styles.contentaddfood}>
             <View style={styles.cardaddfood}>
-              <TouchableOpacity style={styles.addpic}><Text style={{fontSize:70,color:colors.red}}>+</Text></TouchableOpacity>
+              <Image
+                source={require('../photo/OIP.webp')}
+                style={styles.picaddfood}
+              />
             </View>
-            
+
             <View style={styles.dataaddfood}>
-            <View style={styles.bottomaddfood}>
-              <View style={styles.namedata}><Text>Name : </Text>
-                <TextInput style={styles.namefood}></TextInput>
-              </View>
+              <View style={styles.bottomaddfood}>
+                <View style={styles.namedata}>
+                  <Text>Name : </Text>
+                  <TextInput style={styles.namefood} value={menuName} onChangeText={setMenuName}/>
+                </View>
 
+                <View style={styles.namedata}>
+                  <Text>Price : </Text>
+                  <TextInput style={styles.datafood} value={menuPrice} onChangeText={setMenuPrice} keyboardType="numeric"/>
+                </View>
 
-              <View style={styles.namedata}><Text>Price : </Text>
-                <TextInput style={styles.datafood}></TextInput>
-              </View>
+                <View style={styles.namedata}>
+                  <Text>Category : </Text>
+                  <Text style={styles.datafood}>{editMenu?.category_name || '-'}</Text>
+                </View>
 
-            <View style={styles.butt}>
-              <View style={styles.namedata}><Text>Promotion : </Text>
-                <TextInput style={styles.datafood}></TextInput>
-              </View>
+                <View style={styles.option}>
+                  <TouchableOpacity style={styles.fix} onPress={() => { 
+                      setEditMenu(null)
+                      settabfood('listfood')
+                    }}
+                  >
+                    <Text style={{ color: colors.text }}>ยกเลิก</Text>
+                  </TouchableOpacity>
 
-
-              <View style={styles.option}>
-                <TouchableOpacity style={styles.fix} onPress={()=>{settabfood('listfood')}}>
-                  <Text style={{ color: colors.text }} >ยกเลิก</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.fix1} onPress={()=>{settabfood('listfood')}}>
-                  <Text style={{ color: colors.text }}>เสร็จสิ้น</Text>
-                </TouchableOpacity>
-
+                  <TouchableOpacity style={styles.fix1} onPress={saveEdit}>
+                    <Text style={{ color: colors.text }}>เสร็จสิ้น</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-            </View>
+          </View>): tabfood==='addfood'?
+          (
+          <View style={styles.contentaddfood}>
+            <View style={styles.cardaddfood}>
+              <Image
+                source={require('../photo/OIP.webp')}
+                style={styles.picaddfood}
+              />
             </View>
 
+            <View style={styles.dataaddfood}>
+              <View style={styles.bottomaddfood}>
+                <View style={styles.namedata}>
+                  <Text>Name : </Text>
+                  <TextInput style={styles.namefood} value={addName} onChangeText={setAddName}/>
+                </View>
 
+                <View style={styles.namedata}>
+                  <Text>Price : </Text>
+                  <TextInput style={styles.datafood} value={addPrice} onChangeText={setAddPrice} keyboardType="numeric"/>
+                </View>
+
+                <View style={styles.namedata}>
+                  <Text>Category : </Text>
+        
+                  <View style={{ width: 150 }}>
+                    <TouchableOpacity onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}>
+                      <Text>
+                        {addCategoryId ? categories.find(category => category.category_id === addCategoryId)?.category_name : 'เลือกหมวดหมู่'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {showCategoryDropdown && (
+                      <View style={styles.dropdownList}>
+                        {categories.length > 0 ? (
+                          categories.map(category => (
+                            <TouchableOpacity
+                              key={category.category_id}
+                              style={styles.dropdownItem}
+                              onPress={() => {
+                                setAddCategoryId(category.category_id)
+                                setShowCategoryDropdown(false)
+                              }}
+                            >
+                              <Text>{category.category_name}</Text>
+                            </TouchableOpacity>
+                          ))
+                        ) : (
+                          <Text style={{ padding: 10 }}>
+                            ยังไม่มีหมวดหมู่
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={styles.option}>
+                  <TouchableOpacity
+                    style={styles.fix}
+                    onPress={() => settabfood('listfood')}
+                  >
+                    <Text style={{ color: colors.text }}>ยกเลิก</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.fix1}
+                    onPress={() => saveAddMenu()}
+                  >
+                    <Text style={{ color: colors.text }}>เสร็จสิ้น</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
           </View>
           ):(
             <View style={{backgroundColor: 'rgba(255, 255, 255,0.25)',}}>
@@ -246,7 +362,7 @@ function Menu({ changepage }) {
                 </View>
               </View>
               <View style={styles.viewcate}>
-              <TextInput placeholder="ชื่อหมวดหมู่อาหาร" style={styles.framenamecate}></TextInput>
+              <TextInput placeholder="ชื่อหมวดหมู่อาหาร" style={styles.framenamecate} value={categoryName} onChangeText={setCategoryName}/>
               </View>
 
 
@@ -254,7 +370,7 @@ function Menu({ changepage }) {
                 <TouchableOpacity style={styles.fix} onPress={()=>{settabfood('listfood')}}>
                   <Text style={{ color: colors.text }} >ยกเลิก</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.fix1} onPress={()=>{settabfood('listfood')}}>
+                <TouchableOpacity style={styles.fix1} onPress={AddCategory}>
                   <Text style={{ color: colors.text }}>เสร็จสิ้น</Text>
                 </TouchableOpacity>
 
@@ -526,10 +642,46 @@ const styles = StyleSheet.create({
     width:'100%',
     height:'100%',
     backgroundColor: 'rgba(253, 47, 129, 0.26)'
-  }
+  },
+  noData: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  noDataText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold'
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 5
+  },
 
+  categoryButton: {
+    padding: 8,
+    borderWidth: 1,
+    height: '100%'
+  },
 
+  deleteCategory: {
+    padding: 5,
+    marginLeft: 3,
+    backgroundColor: colors.red,
+    borderRadius: 0,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 50,
+    marginLeft: 0
+  },
 
+  deleteCategoryText: {
+    color: colors.dim,
+    fontSize: 16,
+    fontWeight: 'bold'
+  },
 
 })
 export default Menu
