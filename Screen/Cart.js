@@ -1,179 +1,157 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
-// import { useSQLiteContext } from 'expo-sqlite';
-// import { createOrderRound } from '../database/db';
-import { styles } from '../style/cartstyle';
-import { colors } from '../style/theme';
-// ทดลอง *******************************************************************************
-const test_menu = [
-    {   menu_id: 1,
-        name: 'food1', 
-        unit_price: 50, 
-        amount: 1, 
-        note: 'ไม่ผัก',
-        image_url: 'https://img.wongnai.com/p/1968x0/2026/09/09/fb618e99859b48d3a69037722754ca22.jpg'
-    },
-    {   menu_id: 2,
-        name: 'food2', 
-        unit_price: 60, 
-        amount: 2, 
-        note: 'เผ็ดมาก',
-        image_url: 'https://img.wongnai.com/p/400x0/2026/07/01/3cfab8828e5b4c32b41b0fb6def463fa.jpg'
-    },
-    {   menu_id: 3, 
-        name: 'food3', 
-        unit_price: 40, 
-        amount: 1, 
-        note: '',
-        image_url: 'https://img.wongnai.com/p/1968x0/2026/09/05/47a0ad1f819a4a2cb79b143d03434185.jpg'
-    },
-];
-//***********************************************************************************************
-function Cart({ item, navigation }) {
-    // const db = useSQLiteContext();
+import {View,StyleSheet,TouchableOpacity,Text,ImageBackground,ScrollView} from "react-native"
+import {colors} from "../src/style/theme"
+import {useEffect,useState} from "react"
+import {SQLiteProvider,useSQLiteContext} from "expo-sqlite"
+import {DATABASE_NAME,getCart,createOrderRound,openDATABASE,updateCartAmount,removeFromCart} from "../database/db"
 
-    const { bill_id = 1, table_name = 'โต๊ะ 1', cart = test_menu } = item?.params || {};
-
-    const [cartItem, setCartItem] = useState(cart); 
-    const [submit, setSubmit] = useState(false);
-    
-    useEffect(() => {
-        setCartItem(cart.length > 0 ? cart : test_menu);
-    }, [cart]);
-
-    const handdleAmount = (menu_id, n) => {
-        setCartItem(prev => prev.map(item => {
-            if (item.menu_id === menu_id) {
-                const newAmount = item.amount + n;
-                return newAmount > 0 ? { ...item, amount: newAmount } : item;
-            }
-            return item;
-        }));
-    };
-
-    const handdleRemove = (menu_id) => {
-        setCartItem(prev => prev.filter(item => item.menu_id !== menu_id));
-    };
-
-    const totalCartPrice = cartItem.reduce((sum, item) => sum + item.amount * item.unit_price, 0); 
-
-    const handleSubmit = async () => {
-        if (cartItem.length === 0) {
-            Alert.alert('แจ้งเตือน', 'ต้องเลือกรายการอาหารก่อนสร้างรายการสั่งอาหาร');
-            return;
-        }
-        try {
-            setSubmit(true);
-            
-            const formatItem = cartItem.map(item => ({
-                menu_id: item.menu_id,
-                amount: item.amount,
-                unit_price: item.unit_price,
-                note: item.note || '', 
-                status: 'รอทำ',
-            }));
-
-            Alert.alert('สั่งอาหารเสร็จสิ้น', 'ส่งรายการสั่งอาหารเข้าครัวแล้ว', [
-                {
-                    text: 'ตกลง',
-                    onPress: () => {
-                        navigation?.navigate('BillHistory');
-                    }
-                },
-            ]);
-            
-        } catch (e) {
-            console.error('เกิดข้อผิดพลาดในการสั่งอาหาร', e);
-            Alert.alert('สั่งอาหารไม่สำเร็จ', 'โปรดลองใหม่อีกครั้ง');
-        } finally {
-            setSubmit(false);
-        }
-    };
-
-    return (
-        <View style={styles.container}>
-            <Text style={styles.header}>ตะกร้าอาหาร: {table_name}</Text>
-            <FlatList
-                data={cartItem}
-                keyExtractor={(item) => item.menu_id.toString()}
-                renderItem={({ item }) => (
-                    <View style={styles.itemCard}>
-                        {item.image_url ? (
-                            <Image source={{ uri: item.image_url }} style={styles.foodImage} />
-                        ) : null}
-                        <View style={styles.itemDetails}>
-                            <Text style={styles.menuName}>{item.name}</Text>
-                            <Text style={styles.price}>{item.unit_price} บาท </Text>
-                            {item.note ? (
-                                <Text style={styles.noteText}>"{item.note}"</Text>
-                            ) : null}
-                        </View>
-                        <View style={styles.actionContainer}>
-                            <TouchableOpacity 
-                                style={styles.deleteBtn} 
-                                onPress={() => handdleRemove(item.menu_id)}>
-                                <Text style={styles.deleteBtnText}>X</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.qtyContainer}>
-                                <TouchableOpacity 
-                                    style={styles.qtyBtn} 
-                                    onPress={() => handdleAmount(item.menu_id, -1)}>
-                                    <Text style={styles.qtyText}>-</Text>
-                                </TouchableOpacity>
-
-                                <Text style={styles.amountText}>{item.amount}</Text>
-
-                                <TouchableOpacity 
-                                    style={styles.qtyBtn} 
-                                    onPress={() => handdleAmount(item.menu_id, 1)}> 
-                                    <Text style={styles.qtyText}>+</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    </View>
-                )}
-                ListEmptyComponent={
-                    <Text style={{ textAlign: 'center', color: colors.dim, marginTop: 40 }}>
-                        ยังไม่ได้เลือกรายการอาหาร
-                    </Text>
-                }
-            />
-            
-            <View style={styles.footer}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-                    <Text style={styles.totalText}>ราคารวม</Text>
-                    <Text style={styles.totalAmount}>{totalCartPrice} บาท</Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <TouchableOpacity 
-                        style={[
-                            styles.submitButton, { flex: 1, backgroundColor: colors.dim}
-                        ]} 
-                        onPress={() => {
-                        }}>
-                        <Text style={[styles.submitButtonText, { color: colors.bg }]}>ย้อนกลับ</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                        style={[
-                            styles.submitButton, 
-                            { flex: 2 }, 
-                            (cartItem.length === 0 || submit) && { opacity: 0.5 }
-                        ]} 
-                        onPress={handleSubmit}
-                        disabled={cartItem.length === 0 || submit}>
-                        {submit ? (
-                            <ActivityIndicator color={colors.bg} />
-                        ) : (
-                            <Text style={styles.submitButtonText}>ยืนยันส่งเข้าครัว</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </View>
-    );
+function Cart({changepage,billId}) {
+  return <SQLiteProvider onInit={openDATABASE} databaseName={DATABASE_NAME}>
+    <CartScreen changepage={changepage} billId={billId}/>
+  </SQLiteProvider>
 }
 
-export default Cart;
+function CartScreen({changepage,billId}) {
+  const db=useSQLiteContext(),[cart,setCart]=useState([]),[loading,setLoading]=useState(false)
+
+  async function loadCart() {
+    if(!billId)return setCart([])
+    try {setCart(await getCart(db,billId))}
+    catch(error){console.log('โหลดตะกร้าไม่สำเร็จ',error)}
+  }
+
+  async function updateAmount(cartId,amount,change) {
+    try {
+      await updateCartAmount(db,cartId,amount+change)
+      await loadCart()
+    } catch(error) {
+      console.log(change>0?'เพิ่มจำนวนไม่สำเร็จ':'ลดจำนวนไม่สำเร็จ',error)
+    }
+  }
+
+  async function removeItem(cartId) {
+    try {
+      await removeFromCart(db,cartId)
+      await loadCart()
+    } catch(error){console.log('ลบรายการไม่สำเร็จ',error)}
+  }
+
+  async function orderFood() {
+    if(!billId)return console.log('ไม่พบ Bill ID')
+    if(!cart.length)return console.log('ไม่มีอาหารในตะกร้า')
+    if(loading)return
+
+    try {
+      setLoading(true)
+      console.log('สั่งอาหารสำเร็จ',await createOrderRound(db,billId))
+      await loadCart()
+    } catch(error){console.log('สั่งอาหารไม่สำเร็จ',error)}
+    finally{setLoading(false)}
+  }
+
+  useEffect(()=>{loadCart()},[billId])
+
+  return <ImageBackground source={require('../photo/cart.jpg')} style={styles.content}>
+    <ScrollView contentContainerStyle={styles.fixarea}>
+      <View style={styles.top}>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>รายการอาหาร</Text>
+        </View>
+      </View>
+
+      <View style={styles.middle}>
+        {cart.length?cart.map(item=>
+          <View style={styles.order} key={item.cart_id}>
+            <View style={styles.columnorder}>
+              {['ชื่อ','จำนวน','ราคา','หมายเหตุ'].map(x=>
+                <Text style={styles.columntop} key={x}>{x}</Text>
+              )}
+            </View>
+
+            <View style={styles.menu}>
+              <View style={styles.rowmenu}>
+                <Text style={styles.column}>{item.menu_name}</Text>
+                <Text style={styles.column}>{item.amount}</Text>
+                <Text style={styles.column}>{item.unit_price}</Text>
+                <Text style={styles.column}>{item.note||'-'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.actionRow}>
+              <View style={styles.quantityControl}>
+                <TouchableOpacity
+                  style={styles.qtyButton}
+                  onPress={()=>updateAmount(item.cart_id,item.amount,-1)}>
+                  <Text style={styles.qtyButtonText}>-</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.qtyText}>{item.amount}</Text>
+
+                <TouchableOpacity
+                  style={styles.qtyButton}
+                  onPress={()=>updateAmount(item.cart_id,item.amount,1)}>
+                  <Text style={styles.qtyButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={styles.deleteButton} onPress={()=>removeItem(item.cart_id)}>
+                <Text style={styles.deleteButtonText}>ลบ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ):<View style={styles.noData}>
+          <View style={styles.framedata}>
+            <Text style={styles.noDataText}>ยังไม่มีอาหารในตะกร้า</Text>
+          </View>
+        </View>}
+      </View>
+
+      {cart.length>0&&<TouchableOpacity
+        style={[styles.orderButton,loading&&styles.orderButtonDisabled]}
+        onPress={orderFood}
+        disabled={loading}>
+        <Text style={styles.orderButtonText}>{loading?'กำลังสั่ง...':'สั่งออเดอร์'}</Text>
+      </TouchableOpacity>}
+    </ScrollView>
+
+    <View style={styles.bottombar}>
+      {[['เมนูอาหาร','MenuClient'],['ตะกร้าอาหาร','Cart']].map(([text,page])=>
+        <TouchableOpacity key={page} style={styles.page} onPress={()=>changepage(page)}>
+          <Text style={styles.titlepage}>{text}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </ImageBackground>
+}
+
+const styles=StyleSheet.create({
+  content:{flex:1,paddingTop:20},
+  top:{alignItems:'center',marginTop:10},
+  titleContainer:{boxShadow:'0 0 10px rgba(0,0,0,0.5)',paddingLeft:20,paddingRight:20,borderRadius:50},
+  title:{fontSize:45,fontWeight:'bold',color:colors.red},
+  middle:{paddingLeft:25,paddingRight:25},
+  order:{justifyContent:'center',marginTop:20,backgroundColor:'white',boxShadow:'0 0 10px rgba(0,0,0,0.5)',borderRadius:15,padding:10},
+  columnorder:{flexDirection:'row',justifyContent:'space-between',borderBottomColor:colors.bg,borderBottomWidth:1},
+  columntop:{width:70},
+  menu:{paddingTop:5},
+  rowmenu:{flexDirection:'row',justifyContent:'space-between'},
+  column:{width:70},
+  actionRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginTop:10,borderTopWidth:1,borderTopColor:colors.bg,paddingTop:8},
+  quantityControl:{flexDirection:'row',alignItems:'center'},
+  qtyButton:{backgroundColor:colors.red,width:30,height:30,justifyContent:'center',alignItems:'center',borderRadius:6},
+  qtyButtonText:{color:colors.text,fontSize:18,fontWeight:'bold'},
+  qtyText:{marginHorizontal:12,fontSize:16,fontWeight:'bold'},
+  deleteButton:{backgroundColor:'#ff4d4d',paddingVertical:5,paddingHorizontal:15,borderRadius:6},
+  deleteButtonText:{color:colors.text,fontSize:14,fontWeight:'bold'},
+  orderButton:{alignSelf:'center',backgroundColor:colors.red,paddingTop:12,paddingBottom:12,paddingLeft:30,paddingRight:30,borderRadius:10,marginTop:20,marginBottom:20},
+  orderButtonDisabled:{opacity:.5},
+  orderButtonText:{color:colors.text,fontSize:18,fontWeight:'bold'},
+  bottombar:{flexDirection:'row',justifyContent:'space-around',position:'absolute',bottom:0,left:0,right:0},
+  page:{borderColor:colors.text,borderTopWidth:2,borderWidth:1,flex:4,height:70,alignItems:'center',justifyContent:'center',backgroundColor:colors.red},
+  titlepage:{color:colors.text,fontSize:20,fontWeight:'bold'},
+  fixarea:{paddingBottom:90},
+  noData:{flex:1,alignItems:'center'},
+  framedata:{alignItems:'center'},
+  noDataText:{color:colors.red,fontSize:20,fontWeight:'bold',marginTop:200,backgroundColor:'rgba(253, 253, 253, 0.7)',borderRadius:15,paddingTop:20,paddingBottom:20,paddingLeft:20,paddingRight:20}
+})
+
+export default Cart
