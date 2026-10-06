@@ -53,7 +53,8 @@ function OrderScreen({ changepage }) {
         ["TableMap", "Table"],
         ["Order", "Order"],
         ["Menu", "Menu"],
-        ["Account", "Account"]
+        ["Account", "Account"],
+        ["Promotion", "Promotion"]
     ]
 
     return (
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     namestatus: { color: colors.text },
     bottombar: { flexDirection: "row", justifyContent: "space-around", position: "absolute", bottom: 0, left: 0, right: 0 },
     page: { borderColor: colors.text, borderTopWidth: 2, borderWidth: 1, flex: 1, height: 70, alignItems: "center", justifyContent: "center", backgroundColor: colors.red },
-    titlepage: { color: colors.text, fontSize: 20, fontWeight: "bold" },
+    titlepage: { color: colors.text, fontSize: 15, fontWeight: "bold" },
     fixarea: { paddingBottom: 90 },
     noData: { flex: 1, alignItems: "center" },
     framedata: { alignItems: "center" },

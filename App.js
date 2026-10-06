@@ -1,162 +1,74 @@
-import {
-    View,
-    StyleSheet
-} from 'react-native'
+import React, { useState } from 'react'
+import { View, StyleSheet } from 'react-native'
 
-import TableMap from './Screen/TableMap.js'
+// Import Screens
 import Login from './Screen/Login.js'
-import Account from './Screen/Account.js'
-import Menu from './Screen/Menu.js'
+import TableMap from './Screen/TableMap.js'
 import Order from './Screen/Order.js'
+import Menu from './Screen/Menu.js'
+import Account from './Screen/Account.js'
 import MenuClient from './Screen/MenuClient.js'
 import Cart from './Screen/Cart.js'
 import BillHistory from './Screen/BillHistory.js'
-
-import { useState } from 'react'
 import Orderhistory from './Screen/Orderhistory.js'
-
-
+import Promotion from './Screen/Promotion.js'
 export default function App() {
+  const [currentpage, setpage] = useState('Login')
+  const [billId, setBillId] = useState(null)
 
-    const [
-        currentpage,
-        setpage
-    ] = useState('Login')
-
-    const [
-        billId,
-        setBillId
-    ] = useState(null)
-
-
-    function changepage(
-        page,
-        newBillId = null
-    ) {
-
-        setpage(page)
-
-        if (newBillId !== null) {
-            setBillId(newBillId)
-        }
+  const changepage = (page, newBillId = null) => {
+    setpage(page)
+    if (newBillId !== null) {
+      setBillId(newBillId)
     }
+  }
 
+  const renderScreen = () => {
+    switch (currentpage) {
+      case 'Login':
+        return <Login changepage={changepage} />
 
-    const screen = () => {
+      case 'TableMap':
+        return <TableMap changepage={changepage} />
 
-        switch (currentpage) {
+      case 'Order':
+        return <Order changepage={changepage} />
 
-            case 'Login':
+      case 'Menu':
+        return <Menu changepage={changepage} />
 
-                return (
-                    <Login
-                        changepage={changepage}
-                    />
-                )
+      case 'Account':
+        return <Account changepage={changepage} />
+    
+      case 'Promotion':
+        return <Promotion changepage={changepage} />
 
+      case 'MenuClient':
+        return <MenuClient changepage={changepage} billId={billId} />
 
-            case 'TableMap':
+      case 'Cart':
+        return <Cart changepage={changepage} billId={billId} />
 
-                return (
-                    <TableMap
-                        changepage={changepage}
-                    />
-                )
+      case 'BillHistory':
+        return <BillHistory changepage={changepage} billId={billId} />
 
+      case 'Orderhistory':
+        return <Orderhistory changepage={changepage} billId={billId} />
 
-            case 'Order':
-
-                return (
-                    <Order
-                        changepage={changepage}
-                    />
-                )
-
-
-            case 'Menu':
-
-                return (
-                    <Menu
-                        changepage={changepage}
-                    />
-                )
-
-
-            case 'Account':
-
-                return (
-                    <Account
-                        changepage={changepage}
-                    />
-                )
-
-
-            case 'MenuClient':
-
-                return (
-                    <MenuClient
-                        changepage={changepage}
-                        billId={billId}
-                    />
-                )
-
-
-            case 'Cart':
-
-                return (
-                    <Cart
-                        changepage={changepage}
-                        billId={billId}
-                    />
-                )
-
-
-            case 'BillHistory':
-
-                return (
-                    <BillHistory
-                        changepage={changepage}
-                        billId={billId}
-                    />
-                )
-
-            case 'Orderhistory':
-
-                return (
-                    <Orderhistory
-                        changepage={changepage}
-                        billId={billId}
-                    />
-                )
-
-
-            default:
-
-                return (
-                    <Login
-                        changepage={changepage}
-                    />
-                )
-        }
+      default:
+        return <Login changepage={changepage} />
     }
+  }
 
-
-    return (
-
-        <View style={styles.container}>
-
-            {screen()}
-
-        </View>
-
-    )
+  return (
+    <View style={styles.container}>
+      {renderScreen()}
+    </View>
+  )
 }
 
-
 const styles = StyleSheet.create({
-
-    container: {
-        flex: 1,
-    },
-
+  container: {
+    flex: 1,
+  },
 })
