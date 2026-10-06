@@ -66,11 +66,23 @@ export async function openDATABASE(db) {
             bill_id INTEGER NOT NULL,
             status TEXT NOT NULL,
             total_price REAL NOT NULL,
+            discount REAL,
+            net_price REAL,
+            promotion_id INTEGER,
             payment_time DATETIME,
             FOREIGN KEY(bill_id) REFERENCES Bills(bill_id)
         );
         CREATE INDEX IF NOT EXISTS idx_menu_category ON Menu(category_id);
         CREATE INDEX IF NOT EXISTS idx_bills_status ON Bills(status);
+
+        CREATE TABLE IF NOT EXISTS promotion (
+            promotion_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            promotion_name TEXT NOT NULL,
+            discount_type TEXT NOT NULL,
+            discount_value REAL NOT NULL,
+            min_price REAL DEFAULT 0,
+            is_active TEXT DEFAULT 'open'
+        );
     `)
 
     const migrations = [
@@ -83,7 +95,10 @@ export async function openDATABASE(db) {
         ['Order_Items', 'status', 'TEXT'],
         ['Order_Items', 'cancelled_at', 'TEXT'],
         ['Menu', 'image', 'TEXT'],
-        ['Menu', 'is_available', 'TEXT']
+        ['Menu', 'is_available', 'TEXT'],
+        ['Transactions', 'discount', 'REAL'],
+        ['Transactions', 'net_price', 'REAL'],
+        ['Transactions', 'promotion_id', 'INTEGER'],
     ]
 
     for (const [table, column, type] of migrations) {
@@ -511,12 +526,12 @@ export async function getBillDetail(db, billId) {
     `, [billId])
 }
 
-export async function closeBill(db, billId) {
+export async function closeBill(db, billId, discount , promotionId) {
     let result = null
 
     await db.withTransactionAsync(async () => {
         const bill = await db.getFirstAsync(`
-            SELECT bill_id,table_id,status
+            SELECT bill_id, table_id, status
             FROM Bills WHERE bill_id=?
         `, [billId])
 
@@ -524,17 +539,20 @@ export async function closeBill(db, billId) {
         if (bill.status !== 'open') throw new Error('บิลนี้ถูกปิดไปแล้ว')
 
         const { total_price: totalPrice } = await db.getFirstAsync(`
-            SELECT COALESCE(SUM(oi.amount*oi.unit_price),0) AS total_price
+            SELECT COALESCE(SUM(oi.amount*oi.unit_price), 0) AS total_price
             FROM Order_Rounds AS r
-            JOIN Order_Items AS oi ON r.order_round_id=oi.order_round_id
+            JOIN Order_Items AS oi ON r.order_round_id = oi.order_round_id
             WHERE r.bill_id=?
         `, [billId])
 
+        const actualDiscount = Math.min(discount || 0, totalPrice)
+        const net_price = Math.max(0, totalPrice - actualDiscount)
+
         await db.runAsync(`
-    UPDATE Bills
-    SET status='closed', close_at=datetime('now', '+7 hours')
-    WHERE bill_id=?
-`, [billId])
+            UPDATE Bills
+            SET status='closed', close_at=datetime('now', '+7 hours')
+            WHERE bill_id=?
+        `, [billId])
 
         await db.runAsync(
             `UPDATE Tables SET table_status='available' WHERE table_id=?`,
@@ -542,19 +560,20 @@ export async function closeBill(db, billId) {
         )
 
         await db.runAsync(`
-    INSERT INTO Transactions(bill_id, status, total_price, payment_time)
-    VALUES(?,?,?,datetime('now', '+7 hours'))
-`, [billId, 'paid', totalPrice])
-
+            INSERT INTO Transactions(bill_id, status, total_price, discount, net_price, promotion_id, payment_time)
+            VALUES(?, ?, ?, ?, ?, ?, datetime('now', '+7 hours'))
+        `, [billId, 'paid', totalPrice, actualDiscount, net_price, promotionId])
         result = {
             billId,
             tableId: bill.table_id,
-            totalPrice
+            totalPrice,
+            discount: actualDiscount,
+            net_price
         }
     })
-
     return result
 }
+
 export function formatThaiDateTime(dateString) {
     if (!dateString) return '-';
 
@@ -602,3 +621,36 @@ export async function getClosedBillDetail(db, billId) {
     return { bill, orders, transaction }
 }
 
+export async function getPromotion(db,Active=false) {
+    const result = Active ? "WHERE is_active='open'" : "";
+    return db.getAllAsync(`
+        SELECT * FROM promotion ${result} ORDER BY promotion_id DESC;
+    `);
+}
+
+export async function savePromotion(db,{ promotionId, promotionName, discountType, discountValue, minPrice }) {
+    if (promotionId) {
+        return db.runAsync(`
+            UPDATE promotion SET promotion_name = ?, discount_type = ?, discount_value = ?, min_price = ? 
+            WHERE promotion_id = ?;
+        `, [promotionName, discountType, discountValue, minPrice, promotionId]);
+    }
+    return db.runAsync(`
+        INSERT INTO promotion(promotion_name, discount_type, discount_value, min_price, is_active)
+        VALUES(?, ?, ?, ?, 'open');
+    `, [promotionName, discountType, discountValue, minPrice]);
+}
+
+export async function updatePromotionStatus(db, promotionId, status) {
+    return db.runAsync(`
+    UPDATE promotion SET is_active = ? WHERE promotion_id = ?;
+  `, [status, promotionId]);
+
+}
+
+export async function deletePromotion(db, promotionId) {
+  return db.runAsync(`
+    DELETE FROM promotion WHERE promotion_id = ?;
+  `, [promotionId]);
+  
+}

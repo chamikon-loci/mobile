@@ -294,7 +294,7 @@ function AccountScreen({ changepage }) {
 
     <View style={styles.bottombar}>
       {[
-        ['Table', 'TableMap'], ['Order', 'Order'], ['Menu', 'Menu'], ['Account', 'Account']
+        ['Table', 'TableMap'], ['Order', 'Order'], ['Menu', 'Menu'], ['Account', 'Account'],['Promotion', 'Promotion']
       ].map(([text, page]) =>
         <TouchableOpacity key={page} style={styles.page} onPress={() => changepage(page)}>
           <Text style={styles.titlepage}>{text}</Text>
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 50, fontWeight: 'bold', color: colors.red },
   bottombar: { flexDirection: 'row', justifyContent: 'space-around', position: 'absolute', bottom: 0, width: '100%' },
   page: { borderColor: colors.text, borderTopWidth: 2, borderWidth: 1, flex: 4, height: 70, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.red },
-  titlepage: { color: colors.text, fontSize: 20, fontWeight: 'bold' },
+  titlepage: { color: colors.text, fontSize: 15, fontWeight: 'bold' },
   column: { flexDirection: 'row', backgroundColor: colors.text, marginTop: 15, justifyContent: 'space-between' },
   category: { borderColor: colors.red, borderWidth: 2, backgroundColor: colors.text, flex: 1, padding: 10 },
   categoryname: { textAlign: 'center', fontSize: 18, fontWeight: 'bold' },

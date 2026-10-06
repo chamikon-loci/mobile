@@ -90,16 +90,27 @@ function TableMapScreen({ changepage }) {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [isMovingTable, setIsMovingTable] = useState(false)
 
+  const [promotion, setPromotion] = useState([])
+  const [selectPromotion, setSelectPromotion] = useState(null)
+
   useEffect(() => {
+    let isMounted = true
     ; (async () => {
       try {
         await insertTable(db, initTables)
         setTable(await getAllTable(db))
+
+        const promotion = await db.getAllAsync(`SELECT * FROM promotion WHERE is_active='open'`)
+        if (isMounted) {setPromotion(promotion||[])}
       } catch (error) {
         console.log('โหลดข้อมูลโต๊ะไม่สำเร็จ', error)
       }
     })()
   }, [db])
+
+  const discount = selectPromotion ? (selectPromotion.discount_type === 'percent' 
+    ? (Number(billTotal)*Number(selectPromotion.discount_value))/100
+    : Number(selectPromotion.discount_value)) : 0
 
   const resetForm = () => {
     setCustomerName('')
@@ -115,6 +126,7 @@ function TableMapScreen({ changepage }) {
     setBillTotal(0)
     setOpen('info')
     setIsMovingTable(false)
+    setSelectPromotion(null)
   }
 
   const openTable = async () => {
@@ -179,13 +191,14 @@ function TableMapScreen({ changepage }) {
       await db.withTransactionAsync(async () => {
         await db.runAsync(
           `INSERT INTO Transactions
-   (bill_id, status, total_price, payment_time)
-   VALUES (?, ?, ?, datetime('now', '+7 hours'))`,
-          [selectedBill.bill_id, 'paid', total]
-        )
+          (bill_id, status, total_price, discount, net_price, promotion_id, payment_time)
+          VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+7 hours'))`,
+          [
+            selectedBill.bill_id, selectPromotion? selectPromotion.promotion_id : null, 'paid',total,discount,total-discount
+          ])
         await db.runAsync(
           `UPDATE Bills SET status='closed', close_at=datetime('now', '+7 hours')
-   WHERE bill_id=?`,
+        WHERE bill_id=?`,
           [selectedBill.bill_id]
         )
         await db.runAsync(
@@ -199,6 +212,7 @@ function TableMapScreen({ changepage }) {
       setSelectedBill(null)
       setBillOrders([])
       setBillTotal(0)
+      setSelectPromotion(null)
       setOpen('info')
       console.log('ชำระเงินสำเร็จ', selectedBill.bill_id, total)
     } catch (error) {
@@ -505,11 +519,33 @@ function TableMapScreen({ changepage }) {
 
           <View style={style.bottomopendata}>
             <View style={style.bottompay}>
-              <View style={style.allbill}>
-                <Text style={style.paytext}>
-                  ยอดรวมทั้งหมด {Number(billTotal).toFixed(2)} บาท
-                </Text>
+              <View style={{marginVertical:6,paddingHorizontal:10}} >
+                <Text style={style.paytext}>เลือกส่วนลด</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator = {false}>
+                  <TouchableOpacity style = {[style.butpay,{backgroundColor:colors.red}]} onPress={()=>setSelectPromotion(null)}>
+                    <Text style={style.pay}>ไม่ใช้ส่วนลด</Text>
+                  </TouchableOpacity>
+                  {promotion.map(item=>(
+                    <TouchableOpacity key={item.promotion_id} style = {[style.butpay,{backgroundColor:colors.card}]} 
+                    onPress={()=>setSelectPromotion(item)}>
+                      <Text style={style.pay}>
+                        {item.promotion_name} (-{item.discount_value}{item.discount_type==='percent'?'%':'บาท'})
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
 
+              <View style={style.dispay}>
+                <View style={{flex:1,paddingRight:10}}>
+                <Text style={style.paytext}>
+                  ก่อนใช้ส่วนลด {Number(billTotal).toFixed(2)} บาท
+                </Text>
+                {discount> 0 && (
+                  <Text style={style.distext}>ส่วนลด -{discount.toFixed(2)} บาท</Text>
+                )}
+                <Text style={style.totalpaytext}>ยอดรวมสุทธิ {Number(billTotal-discount).toFixed(2)} บาท</Text>
+                </View>
                 <TouchableOpacity
                   style={[style.butpay, {
                     backgroundColor: isAllServed ? 'rgb(135, 84, 180)' : colors.dim
@@ -647,7 +683,7 @@ function TableMapScreen({ changepage }) {
       </ScrollView>
 
       <View style={style.bottombar}>
-        {['Table', 'Order', 'Menu', 'Account'].map(page => (
+        {['Table', 'Order', 'Menu', 'Account', 'Promotion'].map(page => (
           <TouchableOpacity key={page} style={style.page} onPress={() => changepage(page)}>
             <Text style={style.titlepage}>{page}</Text>
           </TouchableOpacity>
@@ -704,7 +740,7 @@ const style = StyleSheet.create({
     height: 60, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.red
   },
-  titlepage: { color: colors.text, fontSize: 18, fontWeight: 'bold' },
+  titlepage: { color: colors.text, fontSize: 15, fontWeight: 'bold' },
   boxdata: { flexDirection: 'column', marginBottom: 5 },
   box: {
     backgroundColor: colors.text, borderRadius: 20, paddingLeft: 20,
@@ -821,7 +857,19 @@ const style = StyleSheet.create({
   },
   textswitch: {
     fontSize: 14, color: colors.text, fontWeight: 'bold'
+  },
+  dispay:{
+    flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:'#fff',paddingHorizontal:15,paddingVertical:10,
+    borderWidth:1, borderColor:'#eee',marginBottom:5,
+  },
+  totalpaytext:{
+    fontSize:16,fontWeight:'bold',color:colors.green,},
+  distext:{
+    fontSize:16,fontWeight:'bold',color:colors.card,},
+  discard:{
+
   }
+  
 })
 
 export default TableMap
