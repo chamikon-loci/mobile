@@ -214,8 +214,13 @@ function MenuScreen({ changepage }) {
                 {menu.length ? menu.map(item => (
                   <View style={styles.card} key={item.menu_id}>
                     <Image
-                      source={item.image ? { uri: item.image } : require("../photo/OIP.webp")}
-                      style={styles.picfood}
+                        source={
+                            item.image
+                                ? { uri: item.image }
+                                : require("../photo/plus.webp")
+                        }
+                        style={styles.picfood}
+                        resizeMode="cover"
                     />
 
                     <View style={styles.data}>
@@ -269,8 +274,13 @@ function MenuScreen({ changepage }) {
               <TouchableOpacity onPress={() => pickImage(setEditImage)}>
                 <View style={styles.cardaddfood}>
                   <Image
-                    source={editImage ? { uri: editImage } : require("../photo/plus.webp")}
-                    style={styles.picaddfood}
+                      source={
+                          editImage
+                              ? { uri: editImage }
+                              : require("../photo/plus.webp")
+                      }
+                      style={styles.picaddfood}
+                      resizeMode="cover"
                   />
                   <Text style={{ color: colors.red, marginTop: 5 }}>[ เปลี่ยนรูปภาพ ]</Text>
                 </View>
