@@ -7,7 +7,7 @@ import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite'
 import { colors } from '../src/style/theme'
 import {
   DATABASE_NAME, getAllTable, insertTable, openDATABASE, openBill,
-  getOpenBillByTable, getBillOrders, getBillTotal
+  getOpenBillByTable, getBillOrders, getBillTotal, formatThaiDateTime
 } from '../database/db'
 
 const initTables = Array.from({ length: 15 }, (_, i) => ({
@@ -91,7 +91,7 @@ function TableMapScreen({ changepage }) {
   const [isMovingTable, setIsMovingTable] = useState(false)
 
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         await insertTable(db, initTables)
         setTable(await getAllTable(db))
@@ -179,13 +179,13 @@ function TableMapScreen({ changepage }) {
       await db.withTransactionAsync(async () => {
         await db.runAsync(
           `INSERT INTO Transactions
-           (bill_id,status,total_price,payment_time)
-           VALUES (?, ?, ?, datetime('now'))`,
+   (bill_id, status, total_price, payment_time)
+   VALUES (?, ?, ?, datetime('now', '+7 hours'))`,
           [selectedBill.bill_id, 'paid', total]
         )
         await db.runAsync(
-          `UPDATE Bills SET status='closed', close_at=datetime('now')
-           WHERE bill_id=?`,
+          `UPDATE Bills SET status='closed', close_at=datetime('now', '+7 hours')
+   WHERE bill_id=?`,
           [selectedBill.bill_id]
         )
         await db.runAsync(
@@ -335,20 +335,11 @@ function TableMapScreen({ changepage }) {
     }
 
     if (selectedTable.table_status === 'occupied' && open === 'history') {
-      const rounds = billOrders.reduce((arr, item) => {
-        let round = arr.find(x => x.order_round_id === item.order_round_id)
-        if (!round) {
-          round = {
-            order_round_id: item.order_round_id,
-            round: item.round,
-            order_at: item.order_at,
-            items: []
-          }
-          arr.push(round)
-        }
-        round.items.push(item)
-        return arr
-      }, [])
+      const roundsMap = billOrders.reduce((r, item) => {
+        (r[item.round || 1] ||= []).push(item)
+        return r
+      }, {})
+      const roundNumbers = Object.keys(roundsMap).sort((a, b) => Number(a) - Number(b))
 
       return (
         <ImageBackground source={require('../photo/historyorder.jpg')} style={style.content}>
@@ -364,86 +355,151 @@ function TableMapScreen({ changepage }) {
             <View style={style.middlehistory}>
               {loadingHistory ? (
                 <Text style={style.loadingText}>กำลังโหลดข้อมูล...</Text>
-              ) : rounds.length === 0 ? (
+              ) : !billOrders.length ? (
                 <View style={style.emptyBox}>
                   <Text style={style.emptyText}>ยังไม่มีรายการอาหาร</Text>
                 </View>
-              ) : rounds.map(round => (
-                <View key={round.order_round_id} style={style.orderCard}>
-                  <View style={style.bill}>
-                    <View style={style.rownotable}>
-                      <Text style={style.notable}>{selectedTable.table_name}</Text>
-                      <Text style={style.numround}>
-                        รอบที่ {round.round} • {round.order_at ? round.order_at.slice(11, 16) : ''} น.
-                      </Text>
-                    </View>
+              ) : (
+                roundNumbers.map(roundNumber => {
+                  const roundItems = roundsMap[roundNumber]
+                  const roundTotal = roundItems.reduce(
+                    (sum, item) => item.status === 'ยกเลิก'
+                      ? sum
+                      : sum + Number(item.unit_price || 0) * Number(item.amount || 0),
+                    0
+                  )
 
-                    <View style={style.columndata}>
-                      <Text style={style.columnname1}>รายการอาหาร</Text>
-                      <Text style={style.columnname2}>จำนวน</Text>
-                      <Text style={style.columnname3}>หมายเหตุ</Text>
-                      <Text style={style.columnname4}>สถานะ</Text>
-                    </View>
+                  return (
+                    <View key={roundNumber} style={style.orderCard}>
+                      <View style={style.bill}>
+                        <View style={style.rownotable}>
+                          <Text style={style.notable}>{selectedTable.table_name}</Text>
+                          <Text style={style.numround}>
+                            รอบที่ {roundNumber} | เวลา : {formatThaiDateTime(roundItems[0]?.order_at)}
+                          </Text>
+                        </View>
 
-                    <View style={style.listfood}>
-                      {round.items.map(item => {
-                        const isCancelled = item.status === 'ยกเลิก'
-                        return (
-                          <View
-                            key={item.order_item_id}
-                            style={[
-                              style.list,
-                              isCancelled && { backgroundColor: '#f9f9f9', opacity: 0.6 }
-                            ]}
-                          >
-                            <View style={style.columnname1}>
-                              <Text style={isCancelled && {
-                                textDecorationLine: 'line-through', color: 'gray'
-                              }}>
-                                {item.menu_name}
-                              </Text>
-                              {isCancelled && item.cancelled_at && (
-                                <Text style={{ fontSize: 10, color: 'red' }}>
-                                  ยกเลิกเมื่อ: {item.cancelled_at}
+                        <View style={style.columndata}>
+                          <Text style={{ flex: 2, fontWeight: 'bold' }}>รายการอาหาร</Text>
+                          <Text style={{ flex: 1, textAlign: 'center', fontWeight: 'bold' }}>จำนวน</Text>
+                          <Text style={{ flex: 1.2, textAlign: 'center', fontWeight: 'bold' }}>ราคาต่อหน่วย</Text>
+                          <Text style={{ flex: 1.2, textAlign: 'center', fontWeight: 'bold' }}>ราคารวม</Text>
+                          <Text style={{ flex: 1.2, textAlign: 'center', fontWeight: 'bold' }}>สถานะ/ยกเลิก</Text>
+                        </View>
+
+                        <View style={style.listfood}>
+                          {roundItems.map(item => {
+                            const currentStatus = item.status || 'รอทำ'
+                            const isWaiting = currentStatus === 'รอทำ'
+                            const isCancelled = currentStatus === 'ยกเลิก'
+                            const unitPrice = Number(item.unit_price || 0)
+                            const itemTotal = isCancelled ? 0 : unitPrice * Number(item.amount || 0)
+
+                            return (
+                              <View
+                                key={item.order_item_id}
+                                style={[
+                                  style.list,
+                                  {
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    paddingVertical: 8,
+                                    borderBottomWidth: 0.5,
+                                    borderBottomColor: '#eee',
+                                    opacity: isCancelled ? 0.5 : 1
+                                  }
+                                ]}
+                              >
+                                <View style={{ flex: 2 }}>
+                                  <Text style={{
+                                    fontWeight: 'bold',
+                                    textDecorationLine: isCancelled ? 'line-through' : 'none'
+                                  }}>
+                                    {item.menu_name}
+                                  </Text>
+
+                                  {item.note && (
+                                    <Text style={{ fontSize: 12, color: colors.dim }}>
+                                      หมายเหตุ : {item.note}
+                                    </Text>
+                                  )}
+
+
+                                  {isCancelled && item.cancelled_at && (
+                                    <Text style={{ fontSize: 10, color: 'red' }}>
+                                      ยกเลิกเมื่อ: {formatThaiDateTime(item.cancelled_at)}
+                                    </Text>
+                                  )}
+                                </View>
+
+                                <Text style={{
+                                  flex: 1,
+                                  textAlign: 'center',
+                                  textDecorationLine: isCancelled ? 'line-through' : 'none'
+                                }}>
+                                  {item.amount}
                                 </Text>
-                              )}
-                            </View>
-                            <Text style={[
-                              style.columnname2,
-                              isCancelled && { textDecorationLine: 'line-through', color: 'gray' }
-                            ]}>
-                              {item.amount}
-                            </Text>
-                            <Text style={[
-                              style.columnname3,
-                              isCancelled && { textDecorationLine: 'line-through', color: 'gray' }
-                            ]}>
-                              {item.note || '-'}
-                            </Text>
-                            <Text style={[
-                              style.columnname4,
-                              { color: isCancelled ? 'red' : colors.red, fontWeight: 'bold' }
-                            ]}>
-                              {item.status}
-                            </Text>
-                          </View>
-                        )
-                      })}
-                    </View>
 
-                    <View style={style.roundTotal}>
-                      <Text style={style.roundTotalText}>
-                        รวมรอบนี้ {round.items.reduce(
-                          (sum, item) => item.status === 'ยกเลิก'
-                            ? sum
-                            : sum + item.amount * item.unit_price,
-                          0
-                        ).toLocaleString()} บาท
-                      </Text>
+                                <Text style={{
+                                  flex: 1.2,
+                                  textAlign: 'center',
+                                  textDecorationLine: isCancelled ? 'line-through' : 'none'
+                                }}>
+                                  {unitPrice.toFixed(2)} บาท
+                                </Text>
+
+                                <Text style={{
+                                  flex: 1.2,
+                                  textAlign: 'center',
+                                  textDecorationLine: isCancelled ? 'line-through' : 'none'
+                                }}>
+                                  {itemTotal.toFixed(2)} บาท
+                                </Text>
+
+                                <View style={{ flex: 1.2, alignItems: 'center' }}>
+                                  <Text style={{
+                                    fontSize: 12,
+                                    fontWeight: 'bold',
+                                    color: currentStatus === 'เสิร์ฟแล้ว' ? 'green' :
+                                      currentStatus === 'กำลังทำ' ? 'orange' :
+                                        currentStatus === 'ยกเลิก' ? 'gray' : 'red'
+                                  }}>
+                                    {currentStatus}
+                                  </Text>
+
+                                  
+                                  {isCancelled && item.cancelled_at && (
+                                    <Text style={{ fontSize: 10, color: 'red', textAlign: 'center', marginTop: 2 }}>
+                                      
+                                    </Text>
+                                  )}
+
+                                  {isWaiting && (
+                                    <Text style={{
+                                      fontSize: 10,
+                                      color: colors.dim,
+                                      marginTop: 4
+                                    }}>
+                                      รอลูกค้ายกเลิก
+                                    </Text>
+                                  )}
+                                </View>
+                              </View>
+                            )
+                          })}
+                        </View>
+
+                        <View style={style.roundTotal}>
+                          <Text style={style.roundTotalText}>
+                            รวมรอบที่ {roundNumber} : {roundTotal.toFixed(2)} บาท
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                </View>
-              ))}
+                  )
+                })
+              )}
             </View>
           </ScrollView>
 
@@ -451,8 +507,9 @@ function TableMapScreen({ changepage }) {
             <View style={style.bottompay}>
               <View style={style.allbill}>
                 <Text style={style.paytext}>
-                  ยอดรวมทั้งหมด {Number(billTotal).toLocaleString()} บาท
+                  ยอดรวมทั้งหมด {Number(billTotal).toFixed(2)} บาท
                 </Text>
+
                 <TouchableOpacity
                   style={[style.butpay, {
                     backgroundColor: isAllServed ? 'rgb(135, 84, 180)' : colors.dim
@@ -469,6 +526,7 @@ function TableMapScreen({ changepage }) {
                 </TouchableOpacity>
               </View>
             </View>
+
             <BottomTabs setOpen={setOpen} />
           </View>
         </ImageBackground>
@@ -750,7 +808,7 @@ const style = StyleSheet.create({
   },
   paytext: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   butpay: {
-    borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20
+    borderRadius: 8, paddingVertical: 10, paddingHorizontal: 20,
   },
   pay: { fontSize: 16, fontWeight: 'bold', color: colors.text },
   bottomopendata1: {

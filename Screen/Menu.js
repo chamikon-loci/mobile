@@ -136,6 +136,16 @@ function MenuScreen({ changepage }) {
     setTabfood("editfood")
   }
 
+    const AllMenu = async () => {
+        try {
+            const data = await getAllMenu(db)
+            
+            setMenu(data)
+        } catch (error) {
+            console.log("ไม่สามารถโหลดข้อมูลเมนูได้", error)
+        }
+    }
+
   return (
     <ImageBackground source={require("../photo/order.jpg")} style={styles.content}>
       <TouchableOpacity style={{ marginLeft: 10 }} onPress={() => changepage("Login")}>
@@ -151,9 +161,16 @@ function MenuScreen({ changepage }) {
       <View style={styles.table}>
         <View style={styles.column}>
           <ScrollView horizontal>
+           
+              
+            
             <TouchableOpacity style={styles.category} onPress={() => setTabfood("addcategory")}>
               <Text style={styles.categoryname}>+ หมวดหมู่อาหาร</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.category} onPress={AllMenu}>
+                <Text style={styles.categoryname}>อาหารทั้งหมด</Text>
+              </TouchableOpacity>
 
             {categories.map(category => (
               <View key={category.category_id} style={styles.categoryItem}>
@@ -164,7 +181,7 @@ function MenuScreen({ changepage }) {
                   ]}
                   onPress={() => setAddCategoryId(category.category_id)}
                 >
-                  <Text>{category.category_name}</Text>
+                  <Text style={styles.categoryname}>{category.category_name}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -273,7 +290,7 @@ function MenuScreen({ changepage }) {
 
                   <View style={[styles.namedata, { position: "relative", zIndex: 10 }]}>
                     <Text>Category : </Text>
-                    
+
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
                       <TouchableOpacity
                         onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -465,8 +482,8 @@ const styles = StyleSheet.create({
   fix1: { padding: 5, backgroundColor: "rgb(14, 84, 236)", marginRight: 10, borderRadius: 5, alignItems: "center" },
   edit: { padding: 5, backgroundColor: "rgb(14, 84, 236)", marginRight: 10, borderRadius: 5, alignItems: "center", marginTop: 10, width: 50 },
   table: { flex: 1 },
-  namefood: { borderColor: "rgba(172, 169, 169, 0.9)", fontWeight: "bold", fontSize: 19, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, paddingLeft: 5, borderRadius: 15 },
-  datafood: { borderColor: "rgba(172, 169, 169, 0.9)", fontSize: 15, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, borderRadius: 15, paddingLeft: 5 },
+  namefood: { borderColor: "rgba(172, 169, 169, 0.9)", fontWeight: "bold", fontSize: 19, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, paddingLeft: 10, borderRadius: 15,paddingRight:10 },
+  datafood: { borderColor: "rgba(172, 169, 169, 0.9)", fontSize: 15, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, borderRadius: 15, paddingLeft: 10,paddingRight:10 },
   butaddfood: { backgroundColor: colors.text, padding: 5, borderRadius: 20, marginBottom: 5, marginTop: 5, alignItems: "center", boxShadow: "0 0 6px rgba(0, 0, 0, 0.5)" },
   cardaddfood: { borderBottomWidth: 1, borderColor: "rgba(232, 227, 227, 1)", flexDirection: "column", width: "100%", alignItems: "center", marginTop: 10 },
   contentaddfood: { backgroundColor: "rgba(232, 227, 227, 0.5)", flex: 1, alignItems: "center" },
@@ -484,10 +501,10 @@ const styles = StyleSheet.create({
   bottomcate: { width: "100%", height: "100%", backgroundColor: "rgba(253, 47, 129, 0.26)" },
   noData: { justifyContent: "center", height: "90%", alignItems: "center" },
   noDataText: { color: colors.red, fontSize: 20, fontWeight: "bold", backgroundColor: "rgba(253, 253, 253, 0.7)", borderRadius: 15, paddingLeft: 80, paddingRight: 80, paddingTop: 20, paddingBottom: 20 },
-  categoryItem: { flexDirection: "row", alignItems: "center", marginRight: 5 },
-  categoryButton: { padding: 8, borderWidth: 1, height: "100%" },
-  deleteCategory: { padding: 5, marginLeft: 0, backgroundColor: colors.red, borderRadius: 0, borderWidth: 1, alignItems: "center", justifyContent: "center", height: 50 },
-  deleteCategoryText: { color: colors.dim, fontSize: 16, fontWeight: "bold" },
+  categoryItem: { flexDirection: "row", alignItems: "center", marginRight: 1 },
+  categoryButton: { padding: 8, borderWidth: 2, height: "100%",borderColor:colors.red },
+  deleteCategory: { padding: 5, marginLeft: 0, backgroundColor: colors.red, borderRadius: 0, borderWidth: 1, alignItems: "center", justifyContent: "center", height: 50 ,borderColor:colors.red},
+  deleteCategoryText: { color: colors.text, fontSize: 16, fontWeight: "bold" },
   dropdownList: { position: "absolute", bottom: 35, left: 0, backgroundColor: colors.text, borderWidth: 1, borderColor: "rgba(172, 169, 169, 0.9)", borderRadius: 10, width: 110, maxHeight: 120, zIndex: 100 },
   dropdownItem: { padding: 8, borderBottomWidth: 1, borderBottomColor: "rgba(232, 227, 227, 1)" }
 })

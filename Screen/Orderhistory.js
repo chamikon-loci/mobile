@@ -2,7 +2,7 @@ import { View, StyleSheet, TouchableOpacity, Image, Text, ImageBackground, Scrol
 import { colors } from "../src/style/theme"
 import { useEffect, useState } from "react"
 import { SQLiteProvider, useSQLiteContext } from "expo-sqlite"
-import { DATABASE_NAME, getAllOrder, openDATABASE } from "../database/db"
+import { DATABASE_NAME, getAllOrder, openDATABASE ,formatThaiDateTime} from "../database/db"
 
 function Orderhistory({ changepage }) {
     return (
@@ -19,8 +19,8 @@ function OrderhistoryScreen({ changepage }) {
     const loadHistory = async () => {
         try {
             const allOrders = await getAllOrder(db)
-            // กรองเฉพาะรายการที่สถานะเป็น "เสิร์ฟแล้ว" หรือออร์เดอร์ที่เสร็จสิ้น
-            const finished = allOrders.filter(item => item.status === "เสิร์ฟแล้ว")
+
+            const finished = allOrders.filter(item => item.status === "เสิร์ฟแล้ว" || item.status === "ยกเลิก")
             setHistoryOrders(finished)
         } catch (error) {
             console.log("โหลดประวัติ Order ไม่สำเร็จ", error)
@@ -34,7 +34,7 @@ function OrderhistoryScreen({ changepage }) {
     const pages = [
         ["TableMap", "Table"],
         ["Order", "Order"],
-        ["History", "History"], // เพิ่มปุ่มหน้าประวัติ
+        ["History", "History"],
         ["Menu", "Menu"],
         ["Account", "Account"]
     ]
@@ -58,7 +58,7 @@ function OrderhistoryScreen({ changepage }) {
                             <View style={styles.rownotable}>
                                 <Text style={styles.notable}>โต๊ะที่ {item.table_name}</Text>
                                 <Text style={styles.numround}>
-                                    รอบที่ {item.round} เวลา : {item.order_at}
+                                    รอบที่ {item.round} เวลา : {formatThaiDateTime(item.order_at)}
                                 </Text>
                             </View>
 
@@ -70,7 +70,12 @@ function OrderhistoryScreen({ changepage }) {
 
                             <View style={styles.menu}>
                                 <View style={styles.rowmenu}>
-                                    <Text style={styles.column}>{item.order_menu_name}</Text>
+                                    <Text style={[
+                                        styles.column,
+                                        item.status === "ยกเลิก" && { textDecorationLine: "line-through", color: "gray" }
+                                    ]}>
+                                        {item.order_menu_name}
+                                    </Text>
                                     <Text style={styles.column}>{item.amount}</Text>
                                     <Text style={styles.column}>{item.extra || "-"}</Text>
                                     <Text style={styles.column}>{item.note || "-"}</Text>
@@ -78,8 +83,13 @@ function OrderhistoryScreen({ changepage }) {
                             </View>
 
                             <View style={styles.rowstatus}>
-                                <Text style={{ color: "green", fontWeight: "bold" }}>
-                                    สถานะ : เสิร์ฟแล้วเรียบร้อย
+                                <Text style={{
+                                    color: item.status === "ยกเลิก" ? "red" : "green",
+                                    fontWeight: "bold"
+                                }}>
+                                    {item.status === "ยกเลิก"
+                                        ? `สถานะ : ยกเลิก${item.cancelled_at ? ` เมื่อ ${item.cancelled_at}` : ""}`
+                                        : "สถานะ : เสิร์ฟแล้วเรียบร้อย"}
                                 </Text>
                             </View>
                         </View>
@@ -92,7 +102,6 @@ function OrderhistoryScreen({ changepage }) {
                     )}
                 </View>
             </ScrollView>
-
             <View style={styles.bottombar}>
                 {pages.map(([page, text]) => (
                     <TouchableOpacity

@@ -3,7 +3,7 @@ import {View,Text,ScrollView,TouchableOpacity,ActivityIndicator,ImageBackground,
 import {SQLiteProvider,useSQLiteContext} from 'expo-sqlite'
 import {styles} from '../src/style/billhistorystyle'
 import {colors} from '../src/style/theme'
-import {DATABASE_NAME,openDATABASE,getBillDetail,updateOrderItemStatus} from '../database/db'
+import {DATABASE_NAME,openDATABASE,getBillDetail,updateOrderItemStatus,formatThaiDateTime} from '../database/db'
 
 function BillHistory({changepage,billId,tableName}) {
   return <SQLiteProvider onInit={openDATABASE} databaseName={DATABASE_NAME}>
@@ -26,7 +26,7 @@ function BillHistoryScreen({changepage,billId,tableName}) {
   }
 
   useEffect(()=>{loadBillDetail()},[billId])
-
+  
   const handleCancelItem=async item=>{
     if(item.status&&item.status!=="รอทำ")
       return Alert.alert("ไม่สามารถยกเลิกได้","อาหารรายการนี้กำลังทำหรือเสิร์ฟแล้ว ไม่สามารถยกเลิกได้")
@@ -35,7 +35,7 @@ function BillHistoryScreen({changepage,billId,tableName}) {
       {text:"ไม่",style:"cancel"},
       {text:"ใช่",style:"destructive",onPress:async()=>{
         try {
-          await updateOrderItemStatus(db,item.order_item_id,"ยกเลิก",new Date().toLocaleTimeString())
+          await updateOrderItemStatus(db,item.order_item_id,"ยกเลิก")
           loadBillDetail()
         } catch(error) {
           console.log("ยกเลิกออร์เดอร์ไม่สำเร็จ",error)
@@ -45,13 +45,14 @@ function BillHistoryScreen({changepage,billId,tableName}) {
     ])
   }
 
+
   const getItemTotal=i=>i.status==="ยกเลิก"?0:Number(i.unit_price||0)*Number(i.amount||0)
   const totalPrice=items.reduce((s,i)=>s+getItemTotal(i),0)
   const roundsMap=items.reduce((r,i)=>((r[i.round||1]||=[]).push(i),r),{})
   const roundNumbers=Object.keys(roundsMap).sort((a,b)=>Number(a)-Number(b))
 
   return <ImageBackground source={require('../photo/historyorder.jpg')} style={styles.content}>
-    <ScrollView contentContainerStyle={{paddingBottom:190}}>
+    
       <TouchableOpacity style={{marginLeft:10,marginTop:10}} onPress={()=>changepage('MenuClient',billId)}>
         <Image source={require('../photo/back.png')} style={{width:50,height:50,borderRadius:25}}/>
       </TouchableOpacity>
@@ -62,7 +63,7 @@ function BillHistoryScreen({changepage,billId,tableName}) {
           {tableName?`โต๊ะ : ${tableName} `:''} | รหัสบิล : {billId}
         </Text>
       </View>
-
+<ScrollView contentContainerStyle={{paddingBottom:170,paddingTop:20}}>
       <View style={styles.middlehistory||{paddingHorizontal:20}}>
         {loading?
           <View style={{alignItems:'center',marginTop:30}}>
@@ -82,14 +83,15 @@ function BillHistoryScreen({changepage,billId,tableName}) {
                 <View style={styles.rownotable}>
                   <Text style={styles.notable}>{tableName||'โต๊ะ'}</Text>
                   <Text style={styles.numround}>
-                    รอบที่ {roundNumber} | เวลา : {roundItems[0]?.order_at||'-'}
+                    รอบที่ {roundNumber} | เวลา : {formatThaiDateTime(roundItems[0]?.order_at)}
                   </Text>
                 </View>
 
                 <View style={styles.columndata||{flexDirection:'row',justifyContent:'space-between',borderBottomWidth:1,borderBottomColor:'#ddd',paddingVertical:5}}>
                   <Text style={{flex:2,fontWeight:'bold'}}>รายการอาหาร</Text>
                   <Text style={{flex:1,textAlign:'center',fontWeight:'bold'}}>จำนวน</Text>
-                  <Text style={{flex:1,textAlign:'center',fontWeight:'bold'}}>เพิ่มเติม</Text>
+                  <Text style={{flex:1,textAlign:'center',fontWeight:'bold'}}>ราคาต่อหน่วย</Text>
+                  <Text style={{flex:1,textAlign:'center',fontWeight:'bold'}}>ราคารวม</Text>
                   <Text style={{flex:1,textAlign:'center',fontWeight:'bold'}}>สถานะ/ยกเลิก</Text>
                 </View>
 
@@ -97,6 +99,8 @@ function BillHistoryScreen({changepage,billId,tableName}) {
                   {roundItems.map(item=>{
                     const currentStatus=item.status||"รอทำ"
                     const isWaiting=currentStatus==="รอทำ",isCancelled=currentStatus==="ยกเลิก"
+                    const unitPrice=Number(item.unit_price||0)
+                    const itemTotal=unitPrice*Number(item.amount||0)
 
                     return <View key={item.order_item_id} style={[
                       styles.list,
@@ -117,7 +121,12 @@ function BillHistoryScreen({changepage,billId,tableName}) {
                       </View>
 
                       <Text style={{flex:1,textAlign:'center'}}>{item.amount}</Text>
-                      <Text style={{flex:1,textAlign:'center'}}>{item.extra||'-'}</Text>
+                      <View style={{flex:1,alignItems:'center'}}>
+                        <Text>{unitPrice.toFixed(2)} บาท</Text>
+                      </View>
+                      <View style={{flex:1,alignItems:'center'}}>
+                        <Text>{itemTotal.toFixed(2)} บาท</Text>
+                      </View>
 
                       <View style={{flex:1,alignItems:'center'}}>
                         <Text style={{
@@ -152,9 +161,9 @@ function BillHistoryScreen({changepage,billId,tableName}) {
     {!loading&&items.length>0&&<View style={{
       position:'absolute',bottom:0,left:0,right:0,backgroundColor:'white',padding:15,
       borderTopWidth:1,borderTopColor:'#ddd',flexDirection:'row',
-      justifyContent:'space-between',alignItems:'center'
+      justifyContent:'flex-end',alignItems:'center'
     }}>
-      <Text style={{fontSize:18,fontWeight:'bold',color:colors.red}}>ยอดรวมทั้งสิ้น:</Text>
+      <Text style={{fontSize:18,fontWeight:'bold',color:colors.red,marginRight:10}}>ยอดรวมทั้งสิ้น :</Text>
       <Text style={{fontSize:20,fontWeight:'bold',color:colors.red}}>{totalPrice.toFixed(2)} บาท</Text>
     </View>}
   </ImageBackground>

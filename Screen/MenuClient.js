@@ -20,12 +20,12 @@ function MenuClientScreen({ changepage, billId }) {
     const [menu, setMenu] = useState([])
     const [cart, setCart] = useState([])
     
-    // เปลี่ยนเป็นเก็บสถานะแยกตาม menu_id
+    
     const [foodCounts, setFoodCounts] = useState({})
     const [notes, setNotes] = useState({})
     const [searchText, setSearchText] = useState("")
 
-    // ฟังก์ชันจัดการจำนวนอาหารแยกตาม menu_id
+  
     const numbuyfood = (menuId, check) => {
         setFoodCounts(prev => {
             const currentCount = prev[menuId] || 1
@@ -54,7 +54,7 @@ function MenuClientScreen({ changepage, billId }) {
         try {
             await addToCart(db, billId, menuId, numoffood, price, notes[menuId] || "")
             setCart(await getCart(db, billId))
-            // รีเซ็ตค่าเฉพาะเมนูนั้นๆ หลังเพิ่มลงตะกร้า
+           
             setNotes(prev => ({ ...prev, [menuId]: "" }))
             setFoodCounts(prev => ({ ...prev, [menuId]: 1 }))
         } catch (error) {
@@ -74,7 +74,7 @@ function MenuClientScreen({ changepage, billId }) {
     const AllMenu = async () => {
         try {
             const data = await getAllMenu(db)
-            // หากตาราง Menu ไม่มีคอลัมน์ is_available ให้ใช้ data ตรงๆ ได้เลยครับ
+            
             setMenu(data)
         } catch (error) {
             console.log("ไม่สามารถโหลดข้อมูลเมนูได้", error)
@@ -125,7 +125,7 @@ function MenuClientScreen({ changepage, billId }) {
                 </View>
             </View>
 
-            {/* แถบแสดงหมวดหมู่ */}
+            
             <View style={styles.column}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.categoryItem}>
@@ -184,10 +184,7 @@ function MenuClientScreen({ changepage, billId }) {
                                             />
                                         </View>
 
-                                        <View style={styles.namedata}>
-                                            <Text>Promotion :</Text>
-                                            <TextInput style={styles.datafood} editable={false} value="none" />
-                                        </View>
+                                        
 
                                         <View style={styles.option}>
                                             <View style={styles.namedata}>
@@ -257,14 +254,16 @@ function MenuClientScreen({ changepage, billId }) {
                     <Text style={styles.titlepage}>เมนูอาหาร</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.page} onPress={openCart}>
-                    <Text style={styles.titlepage}>ตะกร้าอาหาร</Text>
+                <TouchableOpacity style={styles.page1} onPress={openCart}>
 
                     {cart.length > 0 && (
                         <View style={styles.cartCount}>
                             <Text style={styles.cartCountText}>{cart.length}</Text>
                         </View>
                     )}
+                    <Text style={styles.titlepage}>ตะกร้าอาหาร</Text>
+
+                    
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.page} onPress={openHistory}>
@@ -290,7 +289,7 @@ const styles = StyleSheet.create({
     card: { backgroundColor: colors.text, padding: 5, flexDirection: "row", borderBottomWidth: 1, borderColor: "rgba(232, 227, 227, 1)" },
     picfood: { width: 180, height: 200 },
     data: { padding: 10 },
-    namedata: { flexDirection: "row", alignItems: "center" },
+    namedata: { flexDirection: "column",  },
     namefood: { borderColor: "rgba(172, 169, 169, 0.9)", fontWeight: "bold", fontSize: 19, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, paddingLeft: 5, borderRadius: 15 },
     datafood: { borderColor: "rgba(172, 169, 169, 0.9)", fontSize: 15, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, borderRadius: 15, paddingLeft: 5, paddingRight: 5 },
     option: { marginTop: 15 },
@@ -299,11 +298,12 @@ const styles = StyleSheet.create({
     numfood: { borderColor: "rgba(172, 169, 169, 0.9)", fontSize: 15, borderWidth: 1, height: 25, padding: 0, marginBottom: 5, borderRadius: 15, paddingLeft: 5, paddingRight: 5 },
     addnum: { backgroundColor: colors.red, paddingTop: 1, paddingBottom: 1, marginLeft: 10, paddingLeft: 8, paddingRight: 8, borderRadius: 20, justifyContent: "center", marginBottom: 5 },
     minusnum: { backgroundColor: colors.red, paddingTop: 1, paddingBottom: 1, marginRight: 10, paddingLeft: 11, paddingRight: 11, borderRadius: 20, justifyContent: "center", marginBottom: 5 },
-    note: { borderColor: "rgba(172, 169, 169, 0.9)", borderWidth: 1, borderRadius: 15, height: 35, paddingLeft: 10, marginBottom: 5 },
+    note: { borderColor: "rgba(172, 169, 169, 0.9)", borderWidth: 1, borderRadius: 25,  paddingLeft: 10, marginBottom: 5 ,paddingRight:10,width:150,height:40},
     bottombar: { flexDirection: "row", justifyContent: "space-around", position: "absolute", bottom: 0, left: 0, right: 0 },
     page: { borderColor: colors.text, borderTopWidth: 2, borderWidth: 1, flex: 1, height: 70, alignItems: "center", justifyContent: "center", backgroundColor: colors.red },
-    titlepage: { color: colors.text, fontSize: 16, fontWeight: "bold", textAlign: "center" },
-    cartCount: { position: "absolute", top: 5, right: 20, minWidth: 22, height: 22, borderRadius: 11, backgroundColor: colors.text, alignItems: "center", justifyContent: "center" },
+     page1: { borderColor: colors.text, borderTopWidth: 2, borderWidth: 1, height: 70, alignItems: "center", justifyContent: "center", backgroundColor: colors.red ,flexDirection:'row',width:140},
+    titlepage: { color: colors.text, fontSize: 16, fontWeight: "bold", textAlign: "center"},
+    cartCount: { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: colors.text, alignItems: "center", justifyContent: "center",marginRight:3 },
     cartCountText: { color: colors.red, fontWeight: "bold" },
     noData: { flex: 1, justifyContent: "center", alignItems: "center", paddingBottom: 100 },
     noDataText: { color: colors.red, fontSize: 20, fontWeight: "bold", backgroundColor: "rgba(253, 253, 253, 0.7)", borderRadius: 15, paddingLeft: 80, paddingRight: 80, paddingTop: 20, paddingBottom: 20 }

@@ -75,6 +75,17 @@ function LoginScreen({ changepage }) {
                 </TouchableOpacity>
             </View>
 
+
+            <View style={{ marginTop: 5, alignItems: 'center',backgroundColor:colors.red,padding:5,borderRadius:10
+             }}>
+                <Text>นายจามีกร เขียวเซน รหัสนิสิต 6721601028</Text>
+                 <Text>นายตฤณภัทร จิตใจดี รหัสนิสิต 6721601168</Text>
+                  <Text>นางสาวนันธิชา พนาดร รหัสนิสิต 6721601303</Text>
+                   <Text>นางสาวสุภารักษ์ สุดธง รหัสนิสิต 6721601583</Text>
+                   <Text>หมู่เรียน  700</Text>
+            </View>
+
+
             <View style={styles.employee_container}>
                 <View>
                     <Text
@@ -95,7 +106,7 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     top: {
-        marginTop: 80,
+        marginTop: 40,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -110,7 +121,7 @@ const styles = StyleSheet.create({
     welcome: {
         fontSize: 25,
         fontWeight: 'bold',
-        color: colors.bg,
+        color: 'black',
         boxShadow: '0 0 6px rgba(0, 0, 0, 0.8)',
         borderRadius: 20,
         padding: 5
@@ -121,6 +132,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         paddingLeft: 22,
         boxShadow: '0 0 10px rgba(0,0,0,0.5)',
+        paddingRight:22
     },
     confirm: {
         marginTop: '20',
