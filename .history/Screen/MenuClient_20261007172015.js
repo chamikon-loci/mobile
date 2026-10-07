@@ -96,12 +96,6 @@ function MenuClientScreen({ changepage, billId }) {
   const openCart = () => changepage("Cart", billId);
   const openHistory = () => changepage("BillHistory", billId);
 
-  // ฟังก์ชันหาชื่อหมวดหมู่จาก category_id
-  const getCategoryName = (categoryId) => {
-    const found = categories.find((cat) => cat.category_id === categoryId);
-    return found ? found.category_name : "-";
-  };
-
   // ฟังก์ชันไปยังหน้าดูรายละเอียดเมนูและเลือก Option
   const handleSelectMenu = (item) => {
     changepage("MenuDetail", {
@@ -186,8 +180,6 @@ function MenuClientScreen({ changepage, billId }) {
           {filteredMenu.length > 0 ? (
             filteredMenu.map((item) => {
               const displayName = item.menu_name || item.name;
-              const categoryName = item.category_name || getCategoryName(item.category_id);
-
               return (
                 <TouchableOpacity
                   style={styles.card}
@@ -211,15 +203,6 @@ function MenuClientScreen({ changepage, billId }) {
                         style={styles.namefood}
                         editable={false}
                         value={String(displayName || "")}
-                      />
-                    </View>
-
-                    <View style={styles.namedata}>
-                      <Text>Category :</Text>
-                      <TextInput
-                        style={styles.datafood}
-                        editable={false}
-                        value={String(categoryName || "")}
                       />
                     </View>
 
@@ -248,7 +231,7 @@ function MenuClientScreen({ changepage, billId }) {
                             fontWeight: "bold",
                           }}
                         >
-                          เพิ่มลงตะกร้าอาหาร
+                          เพิ่มลงตะกร้า
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -363,12 +346,12 @@ const styles = StyleSheet.create({
     paddingLeft: 5,
     paddingRight: 5,
   },
-  option: { marginTop: 10 },
+  option: { marginTop: 15 },
   addcart: {
     padding: 10,
     backgroundColor: colors.red,
     borderRadius: 8,
-    marginTop: 5,
+    marginTop: 10,
   },
   bottombar: {
     flexDirection: "row",

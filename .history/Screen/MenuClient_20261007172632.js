@@ -7,8 +7,6 @@ import {
   Alert,
   ImageBackground,
   Image,
-  StyleSheet,
-  SafeAreaView
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useSQLiteContext, SQLiteProvider } from "expo-sqlite";
@@ -114,7 +112,7 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
   const handleQuantityChange = (change) => {
     const newQty = quantity + change;
     if (newQty < 1) {
-      changepage("MenuClient", { billId }); // ลดต่ำกว่า 1 คือยกเลิกแล้วกลับไปหน้า MenuClient
+      handleBack(); // ลดต่ำกว่า 1 คือยกเลิกแล้วกลับไปหน้า MenuClient
     } else {
       setQuantity(newQty);
     }
@@ -130,26 +128,26 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
       source={require("../photo/MenuClient.jpg")}
       style={styles.bgImage}
     >
-      {/* ปุ่มย้อนกลับไปหน้า MenuClient */}
-      <View style={style.backButtonContainer}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={handleBack}
-          style={style.touchArea}
-        >
-          <Image source={require("../photo/back.png")} style={style.back} />
-        </TouchableOpacity>
-      </View>
+      {/* ปุ่มย้อนกลับ */}
+      <TouchableOpacity
+        style={{ position: "absolute", top: 40, left: 15, zIndex: 10 }}
+        onPress={handleBack}
+      >
+        <Image
+          source={require("../photo/back.png")}
+          style={{ width: 45, height: 45, borderRadius: 22.5 }}
+        />
+      </TouchableOpacity>
 
-      <View style={styles.cardContainer}>
+      <View style={[styles.cardContainer, { marginTop: 90 }]}>
         <ScrollView
           style={styles.contentScroll}
           showsVerticalScrollIndicator={false}
         >
           {/* ชื่อเมนู */}
-          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-            <Text style={styles.menuTitle}>{selectedMenu?.name}</Text>
-          </View>
+          <Text style={styles.menuTitle}>
+            {selectedMenu?.menu_name || selectedMenu?.name}
+          </Text>
           <View style={styles.divider} />
 
           {/* รายการตัวเลือก */}
@@ -228,23 +226,5 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
     </ImageBackground>
   );
 }
-
-const style = StyleSheet.create({
-  backButtonContainer: {
-    position: "absolute",
-    top: 40,
-    left: 15,
-    zIndex: 9999,
-    elevation: 10, // รองรับ Layer บน Android
-  },
-  touchArea: {
-    padding: 5,
-  },
-  back: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
-  },
-});
 
 export default MenuDetail;

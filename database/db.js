@@ -16,7 +16,7 @@ export async function openDATABASE(db) {
             menu_id INTEGER PRIMARY KEY AUTOINCREMENT,
             category_id INTEGER,
             name TEXT NOT NULL,
-            unit_price REAL NOT NULL CHECK(unit_price >= 0),
+            unit_price NUMERIC(10, 2) NOT NULL CHECK(unit_price >= 0),
             image TEXT,
             is_available TEXT CHECK(is_available IN ('open', 'closed', NULL)),
             FOREIGN KEY(category_id) REFERENCES Categories(category_id) ON DELETE RESTRICT
@@ -44,7 +44,7 @@ export async function openDATABASE(db) {
             order_round_id INTEGER NOT NULL,
             menu_id INTEGER NOT NULL,
             amount INTEGER NOT NULL,
-            unit_price REAL NOT NULL,
+            unit_price NUMERIC(10, 2) NOT NULL,
             extra TEXT,
             note TEXT,
             status TEXT NOT NULL,
@@ -56,7 +56,7 @@ export async function openDATABASE(db) {
             bill_id INTEGER NOT NULL,
             menu_id INTEGER NOT NULL,
             amount INTEGER NOT NULL CHECK(amount > 0),
-            unit_price REAL NOT NULL,
+            unit_price NUMERIC(10, 2) NOT NULL,
             note TEXT,
             FOREIGN KEY(bill_id) REFERENCES Bills(bill_id) ON DELETE CASCADE,
             FOREIGN KEY(menu_id) REFERENCES Menu(menu_id) ON DELETE CASCADE
@@ -65,9 +65,9 @@ export async function openDATABASE(db) {
             transaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
             bill_id INTEGER NOT NULL,
             status TEXT NOT NULL,
-            total_price REAL NOT NULL,
-            discount REAL,
-            net_price REAL,
+            total_price NUMERIC(10, 2) NOT NULL,
+            discount NUMERIC(10, 2),
+            net_price NUMERIC(10, 2),
             promotion_id INTEGER,
             payment_time DATETIME,
             FOREIGN KEY(bill_id) REFERENCES Bills(bill_id)
@@ -79,8 +79,8 @@ export async function openDATABASE(db) {
             promotion_id INTEGER PRIMARY KEY AUTOINCREMENT,
             promotion_name TEXT NOT NULL,
             discount_type TEXT NOT NULL,
-            discount_value REAL NOT NULL,
-            min_price REAL DEFAULT 0,
+            discount_value NUMERIC(10, 2) NOT NULL,
+            min_price NUMERIC(10, 2) DEFAULT 0,
             is_active TEXT DEFAULT 'open'
         );
 
@@ -97,8 +97,8 @@ export async function openDATABASE(db) {
             option_id INTEGER PRIMARY KEY AUTOINCREMENT,
             group_id INTEGER NOT NULL,
             name TEXT NOT NULL,
-            price REAL DEFAULT 0,
-            FOREIGN KEY (group_id) REFERENCES MenuOptionGroups(group_id) ON DELETE CASCADE
+            price NUMERIC(10, 2) DEFAULT 0,
+            FOREIGN KEY (group_id) REFERENCES MenuOptions(option_id) ON DELETE CASCADE
         );
     `);
 
@@ -111,10 +111,11 @@ export async function openDATABASE(db) {
     ["Order_Items", "note", "TEXT"],
     ["Order_Items", "status", "TEXT"],
     ["Order_Items", "cancelled_at", "TEXT"],
+    ["Order_Items", "menu_name", "TEXT"],
     ["Menu", "image", "TEXT"],
     ["Menu", "is_available", "TEXT"],
-    ["Transactions", "discount", "REAL"],
-    ["Transactions", "net_price", "REAL"],
+    ["Transactions", "discount", "NUMERIC(10, 2)"],
+    ["Transactions", "net_price", "NUMERIC(10, 2)"],
     ["Transactions", "promotion_id", "INTEGER"],
   ];
 
@@ -131,7 +132,7 @@ export async function insertTable(db, tables) {
   for (const table of tables)
     await db.runAsync(
       `INSERT OR IGNORE INTO Tables(table_name,table_status) VALUES(?,?)`,
-      [table.Table_Name, table.Status],
+      [table.Table_Name, table.Status]
     );
 }
 
@@ -144,43 +145,68 @@ export async function getDailySalesByCategory(db, date) {
         FROM Order_Items AS oi
         JOIN Order_Rounds AS r ON oi.order_round_id = r.order_round_id
         JOIN Bills AS b ON r.bill_id = b.bill_id
-        JOIN Menu AS m ON oi.menu_id = m.menu_id
-        JOIN Categories AS c ON m.category_id = c.category_id
+        LEFT JOIN Menu AS m ON oi.menu_id = m.menu_id
+        LEFT JOIN Categories AS c ON m.category_id = c.category_id
         WHERE DATE(b.open_at) = ? AND b.status = 'closed'
         GROUP BY c.category_id, c.category_name
         ORDER BY total_price DESC
     `,
-    [date],
+    [date]
   );
 }
 
 export async function getBillHistoryByDate(db, date) {
-  return db.getAllAsync(
-    `
-        SELECT b.bill_id, b.open_at, b.close_at, t.table_name,
-               b.customer_name, b.customer_count, b.phone,
-               tr.total_price, tr.payment_time
-        FROM Bills AS b
-        JOIN Tables AS t ON b.table_id = t.table_id
-        LEFT JOIN Transactions AS tr ON b.bill_id = tr.bill_id
-        WHERE DATE(b.open_at) = ? AND b.status = 'closed'
-        ORDER BY b.close_at DESC
-    `,
-    [date],
-  );
+  const bills = await db.getAllAsync(`
+    SELECT b.bill_id, b.open_at, b.close_at, t.table_name, 
+           tr.total_price, tr.discount, tr.net_price AS total_amount,
+           p.promotion_name
+    FROM Bills b
+    JOIN Tables t ON b.table_id = t.table_id
+    LEFT JOIN Transactions tr ON b.bill_id = tr.bill_id
+    LEFT JOIN promotion p ON tr.promotion_id = p.promotion_id
+    WHERE DATE(b.open_at) = ? AND b.status = 'closed'
+    ORDER BY b.close_at DESC
+  `, [date]);
+
+  for (let bill of bills) {
+    const items = await db.getAllAsync(`
+      SELECT oi.menu_name, oi.unit_price, oi.amount, (oi.unit_price * oi.amount) AS total_price
+      FROM Order_Rounds r
+      JOIN Order_Items oi ON r.order_round_id = oi.order_round_id
+      WHERE r.bill_id = ?
+    `, [bill.bill_id]);
+    
+    bill.items = items || [];
+  }
+
+  return bills;
 }
 
 export async function getAllClosedBills(db) {
-  return db.getAllAsync(`
-        SELECT b.bill_id, b.open_at, b.close_at, t.table_name,
-               b.customer_name, b.customer_count, b.phone,
-               tr.total_price, tr.payment_time
-        FROM Bills AS b
-        JOIN Tables AS t ON b.table_id = t.table_id
-        LEFT JOIN Transactions AS tr ON b.bill_id = tr.bill_id
-        WHERE b.status = 'closed'
-        ORDER BY b.close_at DESC
-    `);
+  const bills = await db.getAllAsync(`
+    SELECT b.bill_id, b.open_at, b.close_at, t.table_name, 
+           tr.total_price, tr.discount, tr.net_price AS total_amount,
+           p.promotion_name
+    FROM Bills b
+    JOIN Tables t ON b.table_id = t.table_id
+    LEFT JOIN Transactions tr ON b.bill_id = tr.bill_id
+    LEFT JOIN promotion p ON tr.promotion_id = p.promotion_id
+    WHERE b.status = 'closed'
+    ORDER BY b.close_at DESC
+  `);
+
+  for (let bill of bills) {
+    const items = await db.getAllAsync(`
+      SELECT oi.menu_name, oi.unit_price, oi.amount, (oi.unit_price * oi.amount) AS total_price
+      FROM Order_Rounds r
+      JOIN Order_Items oi ON r.order_round_id = oi.order_round_id
+      WHERE r.bill_id = ?
+    `, [bill.bill_id]);
+    
+    bill.items = items || [];
+  }
+
+  return bills;
 }
 
 export async function getAllTable(db) {
@@ -190,14 +216,14 @@ export async function getAllTable(db) {
 export async function getCart(db, billId) {
   return db.getAllAsync(
     `
-        SELECT c.cart_id,c.bill_id,c.menu_id,c.amount,c.unit_price,c.note,
+        SELECT c.cart_id, c.bill_id, c.menu_id, c.amount, c.unit_price, c.note,
                m.name AS menu_name
         FROM Cart AS c
-        JOIN Menu AS m ON c.menu_id=m.menu_id
-        WHERE c.bill_id=?
+        JOIN Menu AS m ON c.menu_id = m.menu_id
+        WHERE c.bill_id = ?
         ORDER BY c.cart_id
     `,
-    [billId],
+    [billId]
   );
 }
 
@@ -206,18 +232,18 @@ export async function addToCart(db, billId, menuId, amount, unitPrice, note) {
 
   const existing = await db.getFirstAsync(
     `SELECT * FROM Cart WHERE bill_id=? AND menu_id=? AND COALESCE(note,'')=? LIMIT 1`,
-    [billId, menuId, trimmedNote],
+    [billId, menuId, trimmedNote]
   );
 
   if (existing) {
     await db.runAsync(
-      `UPDATE Cart SET amount=?,unit_price=? WHERE cart_id=?`,
-      [existing.amount + amount, unitPrice, existing.cart_id],
+      `UPDATE Cart SET amount=?, unit_price=? WHERE cart_id=?`,
+      [existing.amount + amount, unitPrice, existing.cart_id]
     );
   } else {
     await db.runAsync(
-      `INSERT INTO Cart(bill_id,menu_id,amount,unit_price,note) VALUES(?,?,?,?,?)`,
-      [billId, menuId, amount, unitPrice, trimmedNote],
+      `INSERT INTO Cart(bill_id, menu_id, amount, unit_price, note) VALUES(?,?,?,?,?)`,
+      [billId, menuId, amount, unitPrice, trimmedNote]
     );
   }
 }
@@ -260,29 +286,51 @@ export const getMenu = async (db, categoryId) => {
         WHERE Menu.category_id=?
         ORDER BY Menu.menu_id
     `,
-    [categoryId],
+    [categoryId]
   );
 };
 
 export async function saveMenu(db, menuId, name, unitPrice, categoryId, image) {
+  const isActive = await isMenuInActiveOrder(db, menuId);
+  if (isActive) {
+    throw new Error("ไม่สามารถแก้ไขเมนูนี้ได้ เนื่องจากมีโต๊ะกำลังสั่งและยังไม่ได้เสิร์ฟ");
+  }
   await db.runAsync(
-    `UPDATE Menu SET name=?,unit_price=?,category_id=?,image=? WHERE menu_id=?`,
-    [name, unitPrice, categoryId, image, menuId],
+    `UPDATE Menu SET name=?, unit_price=?, category_id=?, image=? WHERE menu_id=?`,
+    [name, unitPrice, categoryId, image, menuId]
   );
 }
 
 export async function addMenu(db, name, unitPrice, categoryId, image) {
   await db.runAsync(
-    `INSERT INTO Menu(category_id,name,unit_price,image) VALUES(?,?,?,?)`,
-    [categoryId, name, unitPrice, image],
+    `INSERT INTO Menu(category_id, name, unit_price, image) VALUES(?,?,?,?)`,
+    [categoryId, name, unitPrice, image]
   );
 }
 
 export async function deleteMenu(db, menuId) {
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(`DELETE FROM Order_Items WHERE menu_id=?`, [menuId]);
-    await db.runAsync(`DELETE FROM Menu WHERE menu_id=?`, [menuId]);
-  });
+  const isActive = await isMenuInActiveOrder(db, menuId);
+  if (isActive) {
+    throw new Error("ไม่สามารถลบเมนูนี้ได้ เนื่องจากมีโต๊ะกำลังสั่งและอยู่ในระหว่างการปรุง/รอเสิร์ฟ");
+  }
+  await db.runAsync(`DELETE FROM Menu WHERE menu_id=?`, [menuId]);
+}
+
+export async function getBillDetail(db, billId) {
+  return db.getAllAsync(
+    `
+      SELECT oi.order_item_id, oi.order_round_id, oi.menu_id, oi.amount,
+             oi.unit_price, oi.note, oi.status, oi.cancelled_at,
+             oround.round, oround.order_at,
+             COALESCE(oi.menu_name, m.name, 'เมนูถูกลบไปแล้ว') AS menu_name
+      FROM Order_Items oi
+      INNER JOIN Order_Rounds oround ON oi.order_round_id = oround.order_round_id
+      LEFT JOIN Menu m ON oi.menu_id = m.menu_id
+      WHERE oround.bill_id = ?
+      ORDER BY oround.round ASC, oi.order_item_id ASC
+    `,
+    [billId]
+  );
 }
 
 export async function getAllCategories(db) {
@@ -301,7 +349,7 @@ export async function addCategory(db, categoryName) {
 export async function deleteCategory(db, categoryId) {
   const result = await db.getFirstAsync(
     `SELECT COUNT(*) AS count FROM Menu WHERE category_id=?`,
-    [categoryId],
+    [categoryId]
   );
 
   if (result.count > 0) throw new Error("ไม่สามารถลบหมวดหมู่ที่มีเมนูอยู่ได้");
@@ -318,7 +366,7 @@ export async function openBill(
   tableId,
   customerName,
   customerCount,
-  phone,
+  phone
 ) {
   let bill;
 
@@ -330,18 +378,18 @@ export async function openBill(
       billId = generateBillId();
       exists = !!(await db.getFirstAsync(
         `SELECT bill_id FROM Bills WHERE bill_id=?`,
-        [billId],
+        [billId]
       ));
     }
 
     await db.runAsync(
       `
             INSERT INTO Bills(
-                bill_id,table_id,customer_name,customer_count,phone,open_at,status
+                bill_id, table_id, customer_name, customer_count, phone, open_at, status
             )
             VALUES(?,?,?,?,?,datetime('now','+7 hours'),?)
         `,
-      [billId, tableId, customerName, customerCount, phone, "open"],
+      [billId, tableId, customerName, customerCount, phone, "open"]
     );
 
     bill = await db.getFirstAsync(`SELECT * FROM Bills WHERE bill_id=?`, [
@@ -350,7 +398,7 @@ export async function openBill(
 
     await db.runAsync(
       `UPDATE Tables SET table_status='occupied' WHERE table_id=?`,
-      [tableId],
+      [tableId]
     );
   });
 
@@ -365,7 +413,7 @@ export async function getOpenBillByTable(db, tableId) {
         ORDER BY open_at DESC
         LIMIT 1
     `,
-    [tableId],
+    [tableId]
   );
 }
 
@@ -376,7 +424,7 @@ export async function getOpenBillById(db, billId) {
         WHERE bill_id=? AND status='open'
         LIMIT 1
     `,
-    [billId],
+    [billId]
   );
 }
 
@@ -393,61 +441,53 @@ export async function createOrderRound(db, billId) {
   await db.withTransactionAsync(async () => {
     const cartItems = await db.getAllAsync(
       `
-            SELECT cart_id,bill_id,menu_id,amount,unit_price,note
-            FROM Cart
-            WHERE bill_id=?
-            ORDER BY cart_id
-        `,
-      [billId],
+        SELECT c.cart_id, c.bill_id, c.menu_id, c.amount, c.unit_price, c.note, m.name AS menu_name
+        FROM Cart AS c
+        JOIN Menu AS m ON c.menu_id = m.menu_id
+        WHERE c.bill_id = ?
+        ORDER BY c.cart_id
+      `,
+      [billId]
     );
 
     if (!cartItems.length) throw new Error("ไม่มีรายการอาหารในตะกร้า");
 
     const { max_round } = await db.getFirstAsync(
-      `
-            SELECT MAX(round) AS max_round
-            FROM Order_Rounds
-            WHERE bill_id=?
-        `,
-      [billId],
+      `SELECT MAX(round) AS max_round FROM Order_Rounds WHERE bill_id=?`,
+      [billId]
     );
 
     const nextRound = (max_round || 0) + 1;
 
     const { lastInsertRowId: orderRoundId } = await db.runAsync(
-      `
-            INSERT INTO Order_Rounds(bill_id,round,order_at)
-            VALUES(?,?,datetime('now','+7 hours'))
-        `,
-      [billId, nextRound],
+      `INSERT INTO Order_Rounds(bill_id, round, order_at) VALUES(?, ?, datetime('now', '+7 hours'))`,
+      [billId, nextRound]
     );
 
     for (const item of cartItems) {
       await db.runAsync(
         `
-                INSERT INTO Order_Items(
-                    order_round_id,menu_id,amount,unit_price,extra,note,status
-                )
-                VALUES(?,?,?,?,?,?,?)
-            `,
+          INSERT INTO Order_Items(
+            order_round_id, menu_id, menu_name, amount, unit_price, extra, note, status
+          )
+          VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+        `,
         [
           orderRoundId,
           item.menu_id,
+          item.menu_name,
           item.amount,
           item.unit_price,
           null,
           item.note || "",
           "รอทำ",
-        ],
+        ]
       );
     }
 
     await db.runAsync(`DELETE FROM Cart WHERE bill_id=?`, [billId]);
 
-    createdRound = {
-      orderRoundId,
-      round: nextRound,
-    };
+    createdRound = { orderRoundId, round: nextRound };
   });
 
   return createdRound;
@@ -455,21 +495,21 @@ export async function createOrderRound(db, billId) {
 
 export async function getAllOrder(db) {
   return db.getAllAsync(`
-        SELECT oi.order_item_id,oi.amount,oi.unit_price,oi.extra,oi.note,oi.status,oi.cancelled_at,
-               r.order_round_id,r.bill_id,r.round,r.order_at,
-               t.table_name,m.name AS order_menu_name
+        SELECT oi.order_item_id, oi.amount, oi.unit_price, oi.extra, oi.note, oi.status, oi.cancelled_at,
+               r.order_round_id, r.bill_id, r.round, r.order_at,
+               t.table_name, COALESCE(oi.menu_name, m.name, 'เมนูถูกลบไปแล้ว') AS order_menu_name
         FROM Order_Items AS oi
-        JOIN Order_Rounds AS r ON oi.order_round_id=r.order_round_id
-        JOIN Bills AS b ON r.bill_id=b.bill_id
-        JOIN Tables AS t ON b.table_id=t.table_id
-        JOIN Menu AS m ON oi.menu_id=m.menu_id
-        ORDER BY r.order_at ASC,oi.order_item_id ASC
+        JOIN Order_Rounds AS r ON oi.order_round_id = r.order_round_id
+        JOIN Bills AS b ON r.bill_id = b.bill_id
+        JOIN Tables AS t ON b.table_id = t.table_id
+        LEFT JOIN Menu AS m ON oi.menu_id = m.menu_id
+        ORDER BY r.order_at ASC, oi.order_item_id ASC
     `);
 }
 
 export const deleteOrderItem = async (db, orderItemId) => {
   try {
-    await db.runAsync(`DELETE FROM order_items WHERE order_item_id=?`, [
+    await db.runAsync(`DELETE FROM Order_Items WHERE order_item_id=?`, [
       orderItemId,
     ]);
     return true;
@@ -482,29 +522,29 @@ export const deleteOrderItem = async (db, orderItemId) => {
 export async function getBillOrders(db, billId) {
   return db.getAllAsync(
     `
-        SELECT r.order_round_id,r.round,r.order_at,
-               oi.order_item_id,oi.amount,oi.unit_price,oi.extra,oi.note,oi.status,oi.cancelled_at,
-               m.menu_id,m.name AS menu_name,
-               oi.amount*oi.unit_price AS total_price
+        SELECT r.order_round_id, r.round, r.order_at,
+               oi.order_item_id, oi.amount, oi.unit_price, oi.extra, oi.note, oi.status, oi.cancelled_at,
+               oi.menu_id, COALESCE(oi.menu_name, m.name, 'เมนูถูกลบไปแล้ว') AS menu_name,
+               oi.amount * oi.unit_price AS total_price
         FROM Order_Rounds AS r
-        JOIN Order_Items AS oi ON r.order_round_id=oi.order_round_id
-        JOIN Menu AS m ON oi.menu_id=m.menu_id
-        WHERE r.bill_id=?
-        ORDER BY r.round,oi.order_item_id
+        JOIN Order_Items AS oi ON r.order_round_id = oi.order_round_id
+        LEFT JOIN Menu AS m ON oi.menu_id = m.menu_id
+        WHERE r.bill_id = ?
+        ORDER BY r.round, oi.order_item_id
     `,
-    [billId],
+    [billId]
   );
 }
 
 export async function getBillTotal(db, billId) {
   const result = await db.getFirstAsync(
     `
-        SELECT COALESCE(SUM(oi.amount*oi.unit_price),0) AS total_price
+        SELECT COALESCE(SUM(oi.amount * oi.unit_price), 0) AS total_price
         FROM Order_Rounds AS r
-        JOIN Order_Items AS oi ON r.order_round_id=oi.order_round_id
-        WHERE r.bill_id=?
+        JOIN Order_Items AS oi ON r.order_round_id = oi.order_round_id
+        WHERE r.bill_id = ? AND oi.status != 'ยกเลิก'
     `,
-    [billId],
+    [billId]
   );
 
   return result?.total_price || 0;
@@ -512,15 +552,15 @@ export async function getBillTotal(db, billId) {
 
 export async function getKitchenOrders(db) {
   return db.getAllAsync(`
-        SELECT oi.order_item_id,oi.amount,oi.unit_price,oi.extra,oi.note,oi.status,
-               r.order_round_id,r.round,r.order_at,b.bill_id,
-               t.table_id,t.table_name,m.menu_id,m.name AS menu_name
+        SELECT oi.order_item_id, oi.amount, oi.unit_price, oi.extra, oi.note, oi.status,
+               r.order_round_id, r.round, r.order_at, b.bill_id,
+               t.table_id, t.table_name, oi.menu_id, COALESCE(oi.menu_name, m.name, 'เมนูถูกลบไปแล้ว') AS menu_name
         FROM Order_Items AS oi
-        JOIN Order_Rounds AS r ON oi.order_round_id=r.order_round_id
-        JOIN Bills AS b ON r.bill_id=b.bill_id
-        JOIN Tables AS t ON b.table_id=t.table_id
-        JOIN Menu AS m ON oi.menu_id=m.menu_id
-        ORDER BY r.order_at ASC,oi.order_item_id ASC
+        JOIN Order_Rounds AS r ON oi.order_round_id = r.order_round_id
+        JOIN Bills AS b ON r.bill_id = b.bill_id
+        JOIN Tables AS t ON b.table_id = t.table_id
+        LEFT JOIN Menu AS m ON oi.menu_id = m.menu_id
+        ORDER BY r.order_at ASC, oi.order_item_id ASC
     `);
 }
 
@@ -529,13 +569,13 @@ export async function updateOrderItemStatus(db, orderItemId, status) {
     const cancelledAt = new Date().toLocaleString("th-TH");
 
     await db.runAsync(
-      `UPDATE Order_Items SET status=?,cancelled_at=? WHERE order_item_id=?`,
-      [status, cancelledAt, orderItemId],
+      `UPDATE Order_Items SET status=?, cancelled_at=? WHERE order_item_id=?`,
+      [status, cancelledAt, orderItemId]
     );
   } else {
     await db.runAsync(
-      `UPDATE Order_Items SET status=?,cancelled_at=NULL WHERE order_item_id=?`,
-      [status, orderItemId],
+      `UPDATE Order_Items SET status=?, cancelled_at=NULL WHERE order_item_id=?`,
+      [status, orderItemId]
     );
   }
 }
@@ -543,73 +583,56 @@ export async function updateOrderItemStatus(db, orderItemId, status) {
 export async function getDailySales(db, date) {
   return db.getAllAsync(
     `
-        SELECT m.name AS menu_name,
+        SELECT COALESCE(oi.menu_name, m.name, 'เมนูถูกลบไปแล้ว') AS menu_name,
                oi.unit_price,
                SUM(oi.amount) AS quantity,
-               SUM(oi.amount*oi.unit_price) AS total_price,
+               SUM(oi.amount * oi.unit_price) AS total_price,
                c.category_name
         FROM Order_Items AS oi
-        JOIN Order_Rounds AS r ON oi.order_round_id=r.order_round_id
-        JOIN Bills AS b ON r.bill_id=b.bill_id
-        JOIN Menu AS m ON oi.menu_id=m.menu_id
-        LEFT JOIN Categories AS c ON m.category_id=c.category_id
-        WHERE DATE(b.open_at)=? AND b.status='closed'
-        GROUP BY m.menu_id,oi.unit_price,c.category_name
+        JOIN Order_Rounds AS r ON oi.order_round_id = r.order_round_id
+        JOIN Bills AS b ON r.bill_id = b.bill_id
+        LEFT JOIN Menu AS m ON oi.menu_id = m.menu_id
+        LEFT JOIN Categories AS c ON m.category_id = c.category_id
+        WHERE DATE(b.open_at) = ? AND b.status = 'closed' AND oi.status != 'ยกเลิก'
+        GROUP BY oi.menu_id, oi.menu_name, oi.unit_price, c.category_name
         ORDER BY total_price DESC
     `,
-    [date],
+    [date]
   );
 }
 
 export async function getBestSellingMenus(db, date) {
   return db.getAllAsync(
     `
-        SELECT m.menu_id,m.name AS menu_name,m.unit_price,m.image,
+        SELECT oi.menu_id, COALESCE(oi.menu_name, m.name, 'เมนูถูกลบไปแล้ว') AS menu_name, oi.unit_price, m.image,
                SUM(oi.amount) AS quantity,
-               SUM(oi.amount*oi.unit_price) AS total_price
+               SUM(oi.amount * oi.unit_price) AS total_price
         FROM Order_Items AS oi
-        JOIN Order_Rounds AS r ON oi.order_round_id=r.order_round_id
-        JOIN Bills AS b ON r.bill_id=b.bill_id
-        JOIN Menu AS m ON oi.menu_id=m.menu_id
-        WHERE b.status='closed' AND DATE(b.open_at)=?
-        GROUP BY m.menu_id,m.name,m.unit_price,m.image
+        JOIN Order_Rounds AS r ON oi.order_round_id = r.order_round_id
+        JOIN Bills AS b ON r.bill_id = b.bill_id
+        LEFT JOIN Menu AS m ON oi.menu_id = m.menu_id
+        WHERE b.status = 'closed' AND DATE(b.open_at) = ? AND oi.status != 'ยกเลิก'
+        GROUP BY oi.menu_id, oi.menu_name, oi.unit_price, m.image
         ORDER BY quantity DESC
         LIMIT 10
     `,
-    [date],
+    [date]
   );
 }
 
 export async function getBillHistory(db, date) {
   return db.getAllAsync(
     `
-        SELECT b.bill_id,b.open_at,b.close_at,t.table_name,
-               m.name AS menu_name,oi.amount,oi.unit_price
+        SELECT b.bill_id, b.open_at, b.close_at, t.table_name,
+               COALESCE(oi.menu_name, m.name, 'เมนูถูกลบไปแล้ว') AS menu_name, oi.amount, oi.unit_price
         FROM Bills AS b
-        JOIN Tables AS t ON b.table_id=t.table_id
-        JOIN Order_Rounds AS r ON b.bill_id=r.bill_id
-        JOIN Order_Items AS oi ON r.order_round_id=oi.order_round_id
-        JOIN Menu AS m ON oi.menu_id=m.menu_id
-        WHERE DATE(b.open_at)=? AND b.status='closed'
+        JOIN Tables AS t ON b.table_id = t.table_id
+        JOIN Order_Rounds AS r ON b.bill_id = r.bill_id
+        JOIN Order_Items AS oi ON r.order_round_id = oi.order_round_id
+        LEFT JOIN Menu AS m ON oi.menu_id = m.menu_id
+        WHERE DATE(b.open_at) = ? AND b.status = 'closed'
     `,
-    [date],
-  );
-}
-
-export async function getBillDetail(db, billId) {
-  return db.getAllAsync(
-    `
-        SELECT oi.order_item_id,oi.order_round_id,oi.menu_id,oi.amount,
-               oi.unit_price,oi.note,oi.status,oi.cancelled_at,
-               oround.round,oround.order_at,
-               m.name AS menu_name
-        FROM Order_Items oi
-        INNER JOIN Order_Rounds oround ON oi.order_round_id=oround.order_round_id
-        INNER JOIN Menu m ON oi.menu_id=m.menu_id
-        WHERE oround.bill_id=?
-        ORDER BY oround.round ASC,oi.order_item_id ASC
-    `,
-    [billId],
+    [date]
   );
 }
 
@@ -619,11 +642,11 @@ export async function closeBill(db, billId, discount, promotionId) {
   await db.withTransactionAsync(async () => {
     const bill = await db.getFirstAsync(
       `
-            SELECT bill_id,table_id,status
+            SELECT bill_id, table_id, status
             FROM Bills
-            WHERE bill_id=?
+            WHERE bill_id = ?
         `,
-      [billId],
+      [billId]
     );
 
     if (!bill) throw new Error("ไม่พบบิลนี้");
@@ -632,12 +655,12 @@ export async function closeBill(db, billId, discount, promotionId) {
 
     const { total_price: totalPrice } = await db.getFirstAsync(
       `
-            SELECT COALESCE(SUM(oi.amount*oi.unit_price),0) AS total_price
+            SELECT COALESCE(SUM(oi.amount * oi.unit_price), 0) AS total_price
             FROM Order_Rounds AS r
-            JOIN Order_Items AS oi ON r.order_round_id=oi.order_round_id
-            WHERE r.bill_id=?
+            JOIN Order_Items AS oi ON r.order_round_id = oi.order_round_id
+            WHERE r.bill_id = ? AND oi.status != 'ยกเลิก'
         `,
-      [billId],
+      [billId]
     );
 
     const actualDiscount = Math.min(discount || 0, totalPrice);
@@ -646,23 +669,23 @@ export async function closeBill(db, billId, discount, promotionId) {
     await db.runAsync(
       `
             UPDATE Bills
-            SET status='closed',close_at=datetime('now','+7 hours')
+            SET status='closed', close_at=datetime('now', '+7 hours')
             WHERE bill_id=?
         `,
-      [billId],
+      [billId]
     );
 
     await db.runAsync(
       `UPDATE Tables SET table_status='available' WHERE table_id=?`,
-      [bill.table_id],
+      [bill.table_id]
     );
 
     await db.runAsync(
       `
             INSERT INTO Transactions(
-                bill_id,status,total_price,discount,net_price,promotion_id,payment_time
+                bill_id, status, total_price, discount, net_price, promotion_id, payment_time
             )
-            VALUES(?,?,?,?,?,?,datetime('now','+7 hours'))
+            VALUES(?,?,?,?,?,?,datetime('now', '+7 hours'))
         `,
       [
         billId,
@@ -671,7 +694,7 @@ export async function closeBill(db, billId, discount, promotionId) {
         actualDiscount,
         net_price,
         promotionId || null,
-      ],
+      ]
     );
 
     result = {
@@ -690,7 +713,7 @@ export function formatThaiDateTime(dateString) {
   if (!dateString) return "-";
 
   const date = new Date(
-    dateString.replace(" ", "T") + (dateString.includes("Z") ? "" : "Z"),
+    dateString.replace(" ", "T") + (dateString.includes("Z") ? "" : "Z")
   );
 
   if (isNaN(date.getTime())) return dateString;
@@ -710,27 +733,27 @@ export function formatThaiDateTime(dateString) {
 export async function getTableBillHistory(db, tableId) {
   return db.getAllAsync(
     `
-        SELECT b.bill_id,b.table_id,b.customer_name,b.customer_count,b.phone,
-               b.open_at,b.close_at,b.status,
-               tr.status AS payment_status,tr.total_price,tr.payment_time
+        SELECT b.bill_id, b.table_id, b.customer_name, b.customer_count, b.phone,
+               b.open_at, b.close_at, b.status,
+               tr.status AS payment_status, tr.total_price, tr.payment_time
         FROM Bills AS b
-        LEFT JOIN Transactions AS tr ON b.bill_id=tr.bill_id
-        WHERE b.table_id=? AND b.status='closed'
+        LEFT JOIN Transactions AS tr ON b.bill_id = tr.bill_id
+        WHERE b.table_id = ? AND b.status = 'closed'
         ORDER BY b.close_at DESC
     `,
-    [tableId],
+    [tableId]
   );
 }
 
 export async function getClosedBillDetail(db, billId) {
   const bill = await db.getFirstAsync(
     `
-        SELECT b.*,t.table_name
+        SELECT b.*, t.table_name
         FROM Bills AS b
-        JOIN Tables AS t ON b.table_id=t.table_id
-        WHERE b.bill_id=? AND b.status='closed'
+        JOIN Tables AS t ON b.table_id = t.table_id
+        WHERE b.bill_id = ? AND b.status = 'closed'
     `,
-    [billId],
+    [billId]
   );
 
   const orders = await getBillDetail(db, billId);
@@ -738,11 +761,11 @@ export async function getClosedBillDetail(db, billId) {
   const transaction = await db.getFirstAsync(
     `
         SELECT * FROM Transactions
-        WHERE bill_id=?
+        WHERE bill_id = ?
         ORDER BY transaction_id DESC
         LIMIT 1
     `,
-    [billId],
+    [billId]
   );
 
   return {
@@ -764,7 +787,7 @@ export async function getPromotion(db, Active = false) {
 
 export async function savePromotion(
   db,
-  { promotionId, promotionName, discountType, discountValue, minPrice },
+  { promotionId, promotionName, discountType, discountValue, minPrice }
 ) {
   if (promotionId) {
     return db.runAsync(
@@ -776,25 +799,25 @@ export async function savePromotion(
                 min_price=?
             WHERE promotion_id=?
         `,
-      [promotionName, discountType, discountValue, minPrice, promotionId],
+      [promotionName, discountType, discountValue, minPrice, promotionId]
     );
   }
 
   return db.runAsync(
     `
         INSERT INTO promotion(
-            promotion_name,discount_type,discount_value,min_price,is_active
+            promotion_name, discount_type, discount_value, min_price, is_active
         )
         VALUES(?,?,?,?, 'open')
     `,
-    [promotionName, discountType, discountValue, minPrice],
+    [promotionName, discountType, discountValue, minPrice]
   );
 }
 
 export async function updatePromotionStatus(db, promotionId, status) {
   return db.runAsync(
     `UPDATE promotion SET is_active=? WHERE promotion_id=?`,
-    [status, promotionId],
+    [status, promotionId]
   );
 }
 
@@ -809,12 +832,12 @@ export const addOptionGroupWithItems = async (
   menuId,
   groupTitle,
   isRequired,
-  optionsList,
+  optionsList
 ) => {
   await db.withTransactionAsync(async () => {
     const result = await db.runAsync(
       `INSERT INTO MenuOptionGroups (menu_id, title, required) VALUES (?, ?, ?)`,
-      [menuId, groupTitle, isRequired ? 1 : 0],
+      [menuId, groupTitle, isRequired ? 1 : 0]
     );
     const groupId = result.lastInsertRowId;
 
@@ -822,7 +845,7 @@ export const addOptionGroupWithItems = async (
       if (opt.name.trim()) {
         await db.runAsync(
           `INSERT INTO MenuOptions (group_id, name, price) VALUES (?, ?, ?)`,
-          [groupId, opt.name.trim(), Number(opt.price) || 0],
+          [groupId, opt.name.trim(), Number(opt.price) || 0]
         );
       }
     }
@@ -838,13 +861,13 @@ export const deleteOptionGroup = async (db, groupId) => {
 export const getMenuFullDetails = async (db, menuId) => {
   const groups = await db.getAllAsync(
     `SELECT * FROM MenuOptionGroups WHERE menu_id = ?`,
-    [menuId],
+    [menuId]
   );
 
   for (let group of groups) {
     const options = await db.getAllAsync(
       `SELECT * FROM MenuOptions WHERE group_id = ?`,
-      [group.group_id],
+      [group.group_id]
     );
     group.options = options;
   }
@@ -859,7 +882,7 @@ export async function seedInitialData(db) {
   for (const categoryName of categories) {
     const rows = await db.getAllAsync(
       `SELECT category_id FROM Categories WHERE category_name=? ORDER BY category_id ASC`,
-      [categoryName],
+      [categoryName]
     );
 
     let categoryId;
@@ -867,7 +890,7 @@ export async function seedInitialData(db) {
     if (rows.length === 0) {
       const result = await db.runAsync(
         `INSERT INTO Categories(category_name) VALUES(?)`,
-        [categoryName],
+        [categoryName]
       );
 
       categoryId = result.lastInsertRowId;
@@ -1065,37 +1088,51 @@ export async function seedInitialData(db) {
 
     const exists = await db.getFirstAsync(
       `SELECT menu_id FROM Menu WHERE name=? LIMIT 1`,
-      [name],
+      [name]
     );
 
     if (exists) {
       await db.runAsync(
         `UPDATE Menu
-                 SET category_id=?,unit_price=?,image=?,is_available='open'
+                 SET category_id=?, unit_price=?, image=?, is_available='open'
                  WHERE menu_id=?`,
-        [categoryId, price, image, exists.menu_id],
+        [categoryId, price, image, exists.menu_id]
       );
     } else {
       await db.runAsync(
         `INSERT INTO Menu(
-                    category_id,name,unit_price,image,is_available
+                    category_id, name, unit_price, image, is_available
                 )
                 VALUES(?,?,?,?,?)`,
-        [categoryId, name, price, image, "open"],
+        [categoryId, name, price, image, "open"]
       );
     }
   }
 
   const tableCount = await db.getFirstAsync(
-    `SELECT COUNT(*) AS count FROM Tables`,
+    `SELECT COUNT(*) AS count FROM Tables`
   );
 
   if (tableCount.count === 0) {
     for (let i = 1; i <= 6; i++) {
       await db.runAsync(
-        `INSERT INTO Tables(table_name,table_status) VALUES(?,?)`,
-        [`Table ${i}`, "available"],
+        `INSERT INTO Tables(table_name, table_status) VALUES(?,?)`,
+        [`Table ${i}`, "available"]
       );
     }
   }
+}
+
+export async function isMenuInActiveOrder(db, menuId) {
+  const result = await db.getFirstAsync(
+    `SELECT COUNT(*) AS count
+     FROM Order_Items oi
+     JOIN Order_Rounds oround ON oi.order_round_id = oround.order_round_id
+     JOIN Bills b ON oround.bill_id = b.bill_id
+     WHERE oi.menu_id = ? 
+       AND b.status = 'open' 
+       AND oi.status IN ('รอทำ', 'กำลังทำ')`,
+    [menuId]
+  );
+  return result?.count > 0;
 }

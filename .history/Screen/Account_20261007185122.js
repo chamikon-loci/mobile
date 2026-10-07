@@ -299,24 +299,8 @@ function AccountScreen({ changepage }) {
                       </View>
                     </View>
 
-                   <View style={styles.summarybill}>
-                      {/* แสดงโปรโมชันถ้ามีการใช้งาน */}
-                      {bill.promotion_name && (
-                        <Text style={{ fontSize: 14, color: colors.red, fontWeight: 'bold' }}>
-                          โปรโมชัน : {bill.promotion_name}
-                        </Text>
-                      )}
-                      
-                      {/* แสดงส่วนลดถ้ามี */}
-                      {Number(bill.discount || 0) > 0 && (
-                        <Text style={{ fontSize: 14, color: '#666' }}>
-                          ส่วนลด : -{Number(bill.discount).toFixed(2)} บาท
-                        </Text>
-                      )}
-
-                      <Text style={styles.allbill}>
-                        รวมชำระ : {totalAmount.toFixed(2)} บาท
-                      </Text>
+                    <View style={styles.summarybill}>
+                      <Text style={styles.allbill}>รวมชำระ : {totalAmount.toFixed(2)} บาท</Text>
                     </View>
                   </View>
                 );

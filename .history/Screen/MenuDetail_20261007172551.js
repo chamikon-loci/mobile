@@ -6,9 +6,6 @@ import {
   TextInput,
   Alert,
   ImageBackground,
-  Image,
-  StyleSheet,
-  SafeAreaView
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useSQLiteContext, SQLiteProvider } from "expo-sqlite";
@@ -120,36 +117,19 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
     }
   };
 
-  // ฟังก์ชันย้อนกลับไปยังหน้า MenuClient
-  const handleBack = () => {
-    changepage("MenuClient", { billId });
-  };
-
   return (
     <ImageBackground
       source={require("../photo/MenuClient.jpg")}
       style={styles.bgImage}
     >
-      {/* ปุ่มย้อนกลับไปหน้า MenuClient */}
-      <View style={style.backButtonContainer}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={handleBack}
-          style={style.touchArea}
-        >
-          <Image source={require("../photo/back.png")} style={style.back} />
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.cardContainer}>
         <ScrollView
           style={styles.contentScroll}
           showsVerticalScrollIndicator={false}
         >
+          
           {/* ชื่อเมนู */}
-          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-            <Text style={styles.menuTitle}>{selectedMenu?.name}</Text>
-          </View>
+          <Text style={styles.menuTitle}>{selectedMenu?.name}</Text>
           <View style={styles.divider} />
 
           {/* รายการตัวเลือก */}
@@ -229,22 +209,4 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
   );
 }
 
-const style = StyleSheet.create({
-  backButtonContainer: {
-    position: "absolute",
-    top: 40,
-    left: 15,
-    zIndex: 9999,
-    elevation: 10, // รองรับ Layer บน Android
-  },
-  touchArea: {
-    padding: 5,
-  },
-  back: {
-    width: 35,
-    height: 35,
-    borderRadius: 17.5,
-  },
-});
-
-export default MenuDetail;
+export default MenuDetail

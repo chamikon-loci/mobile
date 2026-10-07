@@ -194,17 +194,11 @@ function TableMapScreen({ changepage }) {
           (bill_id, status, total_price, discount, net_price, promotion_id, payment_time)
           VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+7 hours'))`,
           [
-            selectedBill.bill_id,
-            'paid',                                                 // 1. status
-            total,                                                  // 2. total_price
-            discount,                                               // 3. discount
-            total - discount,                                       // 4. net_price
-            selectPromotion ? selectPromotion.promotion_id : null   // 5. promotion_id
-          ]
-        )
+            selectedBill.bill_id, selectPromotion? selectPromotion.promotion_id : null, 'paid',total,discount,total-discount
+          ])
         await db.runAsync(
           `UPDATE Bills SET status='closed', close_at=datetime('now', '+7 hours')
-          WHERE bill_id=?`,
+        WHERE bill_id=?`,
           [selectedBill.bill_id]
         )
         await db.runAsync(
@@ -501,7 +495,7 @@ function TableMapScreen({ changepage }) {
                                       color: colors.dim,
                                       marginTop: 4
                                     }}>
-                                      
+                                      รอลูกค้ายกเลิก
                                     </Text>
                                   )}
                                 </View>

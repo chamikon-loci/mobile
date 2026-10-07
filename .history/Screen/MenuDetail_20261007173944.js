@@ -147,7 +147,7 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
           showsVerticalScrollIndicator={false}
         >
           {/* ชื่อเมนู */}
-          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+          <View style={{flex: 1, justifyContent: 'center'}}>
             <Text style={styles.menuTitle}>{selectedMenu?.name}</Text>
           </View>
           <View style={styles.divider} />

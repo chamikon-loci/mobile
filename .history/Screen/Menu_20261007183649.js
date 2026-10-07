@@ -7,7 +7,6 @@ import {
   ImageBackground,
   ScrollView,
   TextInput,
-  Alert
 } from "react-native";
 import { colors } from "../src/style/theme";
 import { useState, useEffect } from "react";
@@ -16,7 +15,6 @@ import * as ImagePicker from "expo-image-picker";
 import {
   DATABASE_NAME,
   getAllMenu,
-  getMenu,
   saveMenu,
   addMenu,
   openDATABASE,
@@ -27,6 +25,7 @@ import {
   updateMenuStatus,
 } from "../database/db";
 
+import { Alert } from "react-native";
 
 function Menu({ changepage }) {
   return (
@@ -41,8 +40,6 @@ function MenuScreen({ changepage }) {
   const [tabfood, setTabfood] = useState("listfood");
   const [menu, setMenu] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(null); // null = อาหารทั้งหมด
-
   const [editMenu, setEditMenu] = useState(null);
   const [menuName, setMenuName] = useState("");
   const [menuPrice, setMenuPrice] = useState("");
@@ -55,19 +52,10 @@ function MenuScreen({ changepage }) {
   const [addCategoryId, setAddCategoryId] = useState(null);
   const [addImage, setAddImage] = useState(null);
 
-  // กรองเมนูตามหมวดหมู่ที่เลือก
-  const filteredMenu = selectedCategoryId
-    ? menu.filter((item) => item.category_id === selectedCategoryId)
-    : menu;
-
+  
   const loadMenu = async () => {
     try {
-      if (selectedCategoryId) {
-        const data = await getMenu(db, selectedCategoryId);
-        setMenu(data);
-      } else {
-        setMenu(await getAllMenu(db));
-      }
+      setMenu(await getAllMenu(db));
     } catch {
       console.log("ไม่สามารถโหลดข้อมูลเมนูได้");
     }
@@ -84,7 +72,7 @@ function MenuScreen({ changepage }) {
   useEffect(() => {
     loadMenu();
     loadCategories();
-  }, [selectedCategoryId]);
+  }, []);
 
   const pickImage = async (setImage) => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -135,8 +123,8 @@ function MenuScreen({ changepage }) {
       setMenuPrice("");
       setEditImage(null);
       setTabfood("listfood");
-    } catch (error) {
-      Alert.alert("ไม่สามารถดำเนินการได้", error.message || "แก้ไขเมนูไม่สำเร็จ");
+    } catch {
+      console.log("แก้ไขเมนูไม่สำเร็จ");
     }
   };
 
@@ -166,30 +154,18 @@ function MenuScreen({ changepage }) {
   };
 
   const DeleteMenu = async (id) => {
-    Alert.alert("ยืนยันการลบ", "คุณต้องการลบเมนูนี้นานหรือไม่?", [
-      { text: "ยกเลิก", style: "cancel" },
-      {
-        text: "ลบ",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteMenu(db, id);
-            await loadMenu();
-          } catch (error) {
-            Alert.alert("ไม่สามารถลบได้", error.message || "ลบเมนูไม่สำเร็จ");
-          }
-        },
-      },
-    ]);
+    try {
+      await deleteMenu(db, id);
+      await loadMenu();
+    } catch {
+      console.log("ลบเมนูไม่สำเร็จ");
+    }
   };
 
   const DeleteCategory = async (id) => {
     try {
       await deleteCategory(db, id);
       await loadCategories();
-      if (selectedCategoryId === id) {
-        setSelectedCategoryId(null);
-      }
     } catch {
       console.log("ลบหมวดหมู่ไม่สำเร็จ");
     }
@@ -204,16 +180,20 @@ function MenuScreen({ changepage }) {
 
   const editItem = (item) => {
     setEditMenu(item);
-    setMenuName(item.name || item.menu_name || "");
-    setMenuPrice(String(item.unit_price || 0));
+    setMenuName(item.name);
+    setMenuPrice(String(item.unit_price));
     setCategoryId(item.category_id);
     setEditImage(item.image || null);
     setTabfood("editfood");
   };
 
-  const selectCategory = (catId) => {
-    setSelectedCategoryId(catId);
-    setTabfood("listfood");
+  const AllMenu = async () => {
+    try {
+      const data = await getAllMenu(db);
+      setMenu(data);
+    } catch (error) {
+      console.log("ไม่สามารถโหลดข้อมูลเมนูได้", error);
+    }
   };
 
   return (
@@ -236,7 +216,7 @@ function MenuScreen({ changepage }) {
 
       <View style={styles.table}>
         <View style={styles.column}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal>
             <TouchableOpacity
               style={styles.category}
               onPress={() => setTabfood("addcategory")}
@@ -244,18 +224,19 @@ function MenuScreen({ changepage }) {
               <Text style={styles.categoryname}>+ หมวดหมู่อาหาร</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.category}
-              onPress={() => selectCategory(null)}
-            >
+            <TouchableOpacity style={styles.category} onPress={AllMenu}>
               <Text style={styles.categoryname}>อาหารทั้งหมด</Text>
             </TouchableOpacity>
 
             {categories.map((category) => (
-              <View key={category.category_id} style={{ flexDirection: "row" }}>
+              <View key={category.category_id} style={styles.categoryItem}>
                 <TouchableOpacity
-                  style={styles.category}
-                  onPress={() => selectCategory(category.category_id)}
+                  style={[
+                    styles.categoryButton,
+                    addCategoryId === category.category_id &&
+                      styles.categoryButtonActive,
+                  ]}
+                  onPress={() => setAddCategoryId(category.category_id)}
                 >
                   <Text style={styles.categoryname}>
                     {category.category_name}
@@ -263,14 +244,10 @@ function MenuScreen({ changepage }) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={{
-                    padding: 10,
-                    backgroundColor: colors.red,
-                    justifyContent: "center",
-                  }}
+                  style={styles.deleteCategory}
                   onPress={() => DeleteCategory(category.category_id)}
                 >
-                  <Text style={{ color: colors.text }}>X</Text>
+                  <Text style={styles.deleteCategoryText}>×</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -295,8 +272,8 @@ function MenuScreen({ changepage }) {
               </View>
 
               <View style={styles.listfood}>
-                {filteredMenu.length > 0 ? (
-                  filteredMenu.map((item) => (
+                {menu.length ? (
+                  menu.map((item) => (
                     <View style={styles.card} key={item.menu_id}>
                       <Image
                         source={
@@ -312,7 +289,7 @@ function MenuScreen({ changepage }) {
                           <Text>Name : </Text>
                           <TextInput
                             style={styles.namefood}
-                            value={String(item.name || item.menu_name || "")}
+                            value={String(item.name)}
                             editable={false}
                           />
                         </View>
@@ -321,7 +298,7 @@ function MenuScreen({ changepage }) {
                           <Text>Price : </Text>
                           <TextInput
                             style={styles.datafood}
-                            value={String(item.unit_price || 0)}
+                            value={String(item.unit_price)}
                             editable={false}
                           />
                         </View>
@@ -329,9 +306,7 @@ function MenuScreen({ changepage }) {
                         <View style={styles.namedata}>
                           <Text>Category : </Text>
                           <Text style={styles.datafood}>
-                            {item.category_name ||
-                              categories.find((c) => c.category_id === item.category_id)?.category_name ||
-                              "-"}
+                            {item.category_name || "-"}
                           </Text>
                         </View>
 
@@ -371,7 +346,7 @@ function MenuScreen({ changepage }) {
                           </TouchableOpacity>
 
                           <TouchableOpacity
-                            style={styles.fix}
+                            style={styles.optionBtn}
                             onPress={() => changepage("ManageOptions", { selectedMenu: item })}
                           >
                             <Text style={{ color: colors.text }}>+ Option</Text>
@@ -381,8 +356,8 @@ function MenuScreen({ changepage }) {
                     </View>
                   ))
                 ) : (
-                  <View style={styles.nodata}>
-                    <Text style={styles.nodatatext}>ไม่มีเมนูในหมวดหมู่นี้</Text>
+                  <View style={styles.noData}>
+                    <Text style={styles.noDataText}>ไม่มีเมนู</Text>
                   </View>
                 )}
               </View>
@@ -471,29 +446,14 @@ function MenuScreen({ changepage }) {
 
                       {showCategoryDropdown && (
                         <ScrollView
-                          style={{
-                            position: "absolute",
-                            bottom: 35,
-                            left: 0,
-                            backgroundColor: colors.text,
-                            borderWidth: 1,
-                            borderColor: "rgba(172, 169, 169, 0.9)",
-                            borderRadius: 10,
-                            width: 110,
-                            maxHeight: 120,
-                            zIndex: 100,
-                          }}
+                          style={styles.dropdownList}
                           nestedScrollEnabled={true}
                         >
                           {categories.length ? (
                             categories.map((category) => (
                               <TouchableOpacity
                                 key={category.category_id}
-                                style={{
-                                  padding: 8,
-                                  borderBottomWidth: 1,
-                                  borderBottomColor: "rgba(232, 227, 227, 1)",
-                                }}
+                                style={styles.dropdownItem}
                                 onPress={() => {
                                   setCategoryId(category.category_id);
                                   setShowCategoryDropdown(false);
@@ -615,29 +575,14 @@ function MenuScreen({ changepage }) {
 
                       {showCategoryDropdown && (
                         <ScrollView
-                          style={{
-                            position: "absolute",
-                            bottom: 35,
-                            left: 0,
-                            backgroundColor: colors.text,
-                            borderWidth: 1,
-                            borderColor: "rgba(172, 169, 169, 0.9)",
-                            borderRadius: 10,
-                            width: 110,
-                            maxHeight: 120,
-                            zIndex: 100,
-                          }}
+                          style={styles.dropdownList}
                           nestedScrollEnabled={true}
                         >
                           {categories.length ? (
                             categories.map((category) => (
                               <TouchableOpacity
                                 key={category.category_id}
-                                style={{
-                                  padding: 8,
-                                  borderBottomWidth: 1,
-                                  borderBottomColor: "rgba(232, 227, 227, 1)",
-                                }}
+                                style={styles.dropdownItem}
                                 onPress={() => {
                                   setAddCategoryId(category.category_id);
                                   setShowCategoryDropdown(false);
@@ -758,14 +703,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: colors.text,
     marginTop: 15,
+    justifyContent: "space-between",
   },
   category: {
     borderColor: colors.red,
     borderWidth: 2,
     backgroundColor: colors.text,
+    flex: 1,
     padding: 10,
-    justifyContent: "center",
-    alignItems: "center",
   },
   categoryname: { textAlign: "center", fontSize: 18 },
   contentfood: { flex: 1 },
@@ -782,6 +727,12 @@ const styles = StyleSheet.create({
   fix: {
     padding: 5,
     backgroundColor: colors.red,
+    marginRight: 10,
+    borderRadius: 5,
+  },
+  optionBtn: {
+    padding: 5,
+    backgroundColor: "#E67E22",
     marginRight: 10,
     borderRadius: 5,
   },
@@ -903,8 +854,8 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "rgba(253, 47, 129, 0.26)",
   },
-  nodata: { justifyContent: "center", height: "90%", alignItems: "center" },
-  nodatatext: {
+  noData: { justifyContent: "center", height: "90%", alignItems: "center" },
+  noDataText: {
     color: colors.red,
     fontSize: 20,
     fontWeight: "bold",
@@ -914,6 +865,42 @@ const styles = StyleSheet.create({
     paddingRight: 80,
     paddingTop: 20,
     paddingBottom: 20,
+  },
+  categoryItem: { flexDirection: "row", alignItems: "center", marginRight: 1 },
+  categoryButton: {
+    padding: 8,
+    borderWidth: 2,
+    height: "100%",
+    borderColor: colors.red,
+  },
+  deleteCategory: {
+    padding: 5,
+    marginLeft: 0,
+    backgroundColor: colors.red,
+    borderRadius: 0,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 50,
+    borderColor: colors.red,
+  },
+  deleteCategoryText: { color: colors.text, fontSize: 16, fontWeight: "bold" },
+  dropdownList: {
+    position: "absolute",
+    bottom: 35,
+    left: 0,
+    backgroundColor: colors.text,
+    borderWidth: 1,
+    borderColor: "rgba(172, 169, 169, 0.9)",
+    borderRadius: 10,
+    width: 110,
+    maxHeight: 120,
+    zIndex: 100,
+  },
+  dropdownItem: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(232, 227, 227, 1)",
   },
 });
 

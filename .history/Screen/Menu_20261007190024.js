@@ -55,7 +55,7 @@ function MenuScreen({ changepage }) {
   const [addCategoryId, setAddCategoryId] = useState(null);
   const [addImage, setAddImage] = useState(null);
 
-  // กรองเมนูตามหมวดหมู่ที่เลือก
+  // กรองรายการเมนูตามหมวดหมู่ที่เลือก
   const filteredMenu = selectedCategoryId
     ? menu.filter((item) => item.category_id === selectedCategoryId)
     : menu;
@@ -245,32 +245,49 @@ function MenuScreen({ changepage }) {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.category}
+              style={[
+                styles.category,
+                selectedCategoryId === null && styles.categoryActive,
+              ]}
               onPress={() => selectCategory(null)}
             >
-              <Text style={styles.categoryname}>อาหารทั้งหมด</Text>
+              <Text
+                style={[
+                  styles.categoryname,
+                  selectedCategoryId === null && { color: colors.text },
+                ]}
+              >
+                อาหารทั้งหมด
+              </Text>
             </TouchableOpacity>
 
             {categories.map((category) => (
-              <View key={category.category_id} style={{ flexDirection: "row" }}>
+              <View key={category.category_id} style={styles.categoryItem}>
                 <TouchableOpacity
-                  style={styles.category}
+                  style={[
+                    styles.categoryButton,
+                    selectedCategoryId === category.category_id &&
+                      styles.categoryButtonActive,
+                  ]}
                   onPress={() => selectCategory(category.category_id)}
                 >
-                  <Text style={styles.categoryname}>
+                  <Text
+                    style={[
+                      styles.categoryname,
+                      selectedCategoryId === category.category_id && {
+                        color: colors.text,
+                      },
+                    ]}
+                  >
                     {category.category_name}
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={{
-                    padding: 10,
-                    backgroundColor: colors.red,
-                    justifyContent: "center",
-                  }}
+                  style={styles.deleteCategory}
                   onPress={() => DeleteCategory(category.category_id)}
                 >
-                  <Text style={{ color: colors.text }}>X</Text>
+                  <Text style={styles.deleteCategoryText}>×</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -371,7 +388,7 @@ function MenuScreen({ changepage }) {
                           </TouchableOpacity>
 
                           <TouchableOpacity
-                            style={styles.fix}
+                            style={styles.optionBtn}
                             onPress={() => changepage("ManageOptions", { selectedMenu: item })}
                           >
                             <Text style={{ color: colors.text }}>+ Option</Text>
@@ -381,8 +398,8 @@ function MenuScreen({ changepage }) {
                     </View>
                   ))
                 ) : (
-                  <View style={styles.nodata}>
-                    <Text style={styles.nodatatext}>ไม่มีเมนูในหมวดหมู่นี้</Text>
+                  <View style={styles.noData}>
+                    <Text style={styles.noDataText}>ไม่มีเมนูในหมวดหมู่นี้</Text>
                   </View>
                 )}
               </View>
@@ -471,29 +488,14 @@ function MenuScreen({ changepage }) {
 
                       {showCategoryDropdown && (
                         <ScrollView
-                          style={{
-                            position: "absolute",
-                            bottom: 35,
-                            left: 0,
-                            backgroundColor: colors.text,
-                            borderWidth: 1,
-                            borderColor: "rgba(172, 169, 169, 0.9)",
-                            borderRadius: 10,
-                            width: 110,
-                            maxHeight: 120,
-                            zIndex: 100,
-                          }}
+                          style={styles.dropdownList}
                           nestedScrollEnabled={true}
                         >
                           {categories.length ? (
                             categories.map((category) => (
                               <TouchableOpacity
                                 key={category.category_id}
-                                style={{
-                                  padding: 8,
-                                  borderBottomWidth: 1,
-                                  borderBottomColor: "rgba(232, 227, 227, 1)",
-                                }}
+                                style={styles.dropdownItem}
                                 onPress={() => {
                                   setCategoryId(category.category_id);
                                   setShowCategoryDropdown(false);
@@ -615,29 +617,14 @@ function MenuScreen({ changepage }) {
 
                       {showCategoryDropdown && (
                         <ScrollView
-                          style={{
-                            position: "absolute",
-                            bottom: 35,
-                            left: 0,
-                            backgroundColor: colors.text,
-                            borderWidth: 1,
-                            borderColor: "rgba(172, 169, 169, 0.9)",
-                            borderRadius: 10,
-                            width: 110,
-                            maxHeight: 120,
-                            zIndex: 100,
-                          }}
+                          style={styles.dropdownList}
                           nestedScrollEnabled={true}
                         >
                           {categories.length ? (
                             categories.map((category) => (
                               <TouchableOpacity
                                 key={category.category_id}
-                                style={{
-                                  padding: 8,
-                                  borderBottomWidth: 1,
-                                  borderBottomColor: "rgba(232, 227, 227, 1)",
-                                }}
+                                style={styles.dropdownItem}
                                 onPress={() => {
                                   setAddCategoryId(category.category_id);
                                   setShowCategoryDropdown(false);
@@ -767,6 +754,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  categoryActive: {
+    backgroundColor: colors.red,
+  },
   categoryname: { textAlign: "center", fontSize: 18 },
   contentfood: { flex: 1 },
   listfood: { flexDirection: "column" },
@@ -782,6 +772,12 @@ const styles = StyleSheet.create({
   fix: {
     padding: 5,
     backgroundColor: colors.red,
+    marginRight: 10,
+    borderRadius: 5,
+  },
+  optionBtn: {
+    padding: 5,
+    backgroundColor: "#E67E22",
     marginRight: 10,
     borderRadius: 5,
   },
@@ -903,8 +899,8 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "rgba(253, 47, 129, 0.26)",
   },
-  nodata: { justifyContent: "center", height: "90%", alignItems: "center" },
-  nodatatext: {
+  noData: { justifyContent: "center", height: "90%", alignItems: "center" },
+  noDataText: {
     color: colors.red,
     fontSize: 20,
     fontWeight: "bold",
@@ -914,6 +910,45 @@ const styles = StyleSheet.create({
     paddingRight: 80,
     paddingTop: 20,
     paddingBottom: 20,
+  },
+  categoryItem: { flexDirection: "row", alignItems: "center" },
+  categoryButton: {
+    padding: 10,
+    borderWidth: 2,
+    borderColor: colors.red,
+    backgroundColor: colors.text,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  categoryButtonActive: {
+    backgroundColor: colors.red,
+  },
+  deleteCategory: {
+    paddingHorizontal: 8,
+    backgroundColor: colors.red,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    borderColor: colors.red,
+  },
+  deleteCategoryText: { color: colors.text, fontSize: 16, fontWeight: "bold" },
+  dropdownList: {
+    position: "absolute",
+    bottom: 35,
+    left: 0,
+    backgroundColor: colors.text,
+    borderWidth: 1,
+    borderColor: "rgba(172, 169, 169, 0.9)",
+    borderRadius: 10,
+    width: 110,
+    maxHeight: 120,
+    zIndex: 100,
+  },
+  dropdownItem: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(232, 227, 227, 1)",
   },
 });
 

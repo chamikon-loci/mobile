@@ -131,7 +131,7 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
       style={styles.bgImage}
     >
       {/* ปุ่มย้อนกลับไปหน้า MenuClient */}
-      <View style={style.backButtonContainer}>
+      <SafeAreaView style={style.backButtonContainer}>
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={handleBack}
@@ -139,7 +139,7 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
         >
           <Image source={require("../photo/back.png")} style={style.back} />
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
 
       <View style={styles.cardContainer}>
         <ScrollView
@@ -147,9 +147,7 @@ function MenuDetailContent({ changepage, selectedMenu, billId }) {
           showsVerticalScrollIndicator={false}
         >
           {/* ชื่อเมนู */}
-          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-            <Text style={styles.menuTitle}>{selectedMenu?.name}</Text>
-          </View>
+          <Text style={styles.menuTitle}>{selectedMenu?.name}</Text>
           <View style={styles.divider} />
 
           {/* รายการตัวเลือก */}

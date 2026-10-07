@@ -248,7 +248,7 @@ function MenuClientScreen({ changepage, billId }) {
                             fontWeight: "bold",
                           }}
                         >
-                          เพิ่มลงตะกร้าอาหาร
+                          เลือกออปชัน / สั่งอาหาร
                         </Text>
                       </TouchableOpacity>
                     </View>

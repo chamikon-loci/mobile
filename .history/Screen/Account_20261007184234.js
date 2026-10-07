@@ -150,9 +150,9 @@ function AccountScreen({ changepage }) {
                 <View style={styles.framedata2}>
                   <View style={styles.topdata}><Text style={styles.titledata}>รายได้ทั้งหมด</Text></View>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 10 }}>
-                    {['All', ...categorySales.map(c => c.category_name || 'อื่นๆ')].map((cat, index) =>
+                    {['All', ...categorySales.map(c => c.category_name || 'อื่นๆ')].map(cat =>
                       <TouchableOpacity
-                        key={`${cat}-${index}`} // ใช้ผสมคำและ index ป้องกัน key ซ้ำ
+                        key={cat}
                         style={[styles.filterBtn, selectedCategory === cat && styles.filterBtnActive]}
                         onPress={() => setSelectedCategory(cat)}>
                         <Text style={[styles.filterBtnText, selectedCategory === cat && styles.filterBtnTextActive]}>
@@ -206,7 +206,7 @@ function AccountScreen({ changepage }) {
           <View style={styles.contentrank}>
             {rankSales.length ? (
               rankSales.map((item, index) => (
-                <View key={item.menu_id ? `rank-${item.menu_id}-${index}` : `rank-${index}`} style={styles.framerank}>
+                <View key={item.menu_id || index} style={styles.framerank}>
 
 
                   <View style={styles.picrank}>
@@ -299,24 +299,8 @@ function AccountScreen({ changepage }) {
                       </View>
                     </View>
 
-                   <View style={styles.summarybill}>
-                      {/* แสดงโปรโมชันถ้ามีการใช้งาน */}
-                      {bill.promotion_name && (
-                        <Text style={{ fontSize: 14, color: colors.red, fontWeight: 'bold' }}>
-                          โปรโมชัน : {bill.promotion_name}
-                        </Text>
-                      )}
-                      
-                      {/* แสดงส่วนลดถ้ามี */}
-                      {Number(bill.discount || 0) > 0 && (
-                        <Text style={{ fontSize: 14, color: '#666' }}>
-                          ส่วนลด : -{Number(bill.discount).toFixed(2)} บาท
-                        </Text>
-                      )}
-
-                      <Text style={styles.allbill}>
-                        รวมชำระ : {totalAmount.toFixed(2)} บาท
-                      </Text>
+                    <View style={styles.summarybill}>
+                      <Text style={styles.allbill}>รวมชำระ : {totalAmount.toFixed(2)} บาท</Text>
                     </View>
                   </View>
                 );
