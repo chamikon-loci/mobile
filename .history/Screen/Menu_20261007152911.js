@@ -3,7 +3,7 @@ import { colors } from "../src/style/theme"
 import { useState, useEffect } from "react"
 import { SQLiteProvider, useSQLiteContext } from "expo-sqlite"
 import * as ImagePicker from "expo-image-picker"
-import { DATABASE_NAME, getAllMenu, saveMenu, addMenu, openDATABASE, getAllCategories, addCategory, deleteCategory, deleteMenu, updateMenuStatus, getMenu } from "../database/db"
+import { DATABASE_NAME, getAllMenu, saveMenu, addMenu, openDATABASE, getAllCategories, addCategory, deleteCategory, deleteMenu, updateMenuStatus } from "../database/db"
 
 function Menu({ changepage }) {
   return (
@@ -128,10 +128,7 @@ function MenuScreen({ changepage }) {
     try {
       await deleteCategory(db, id)
       await loadCategories()
-    } catch (error) {
-      console.log("ลบหมวดหมู่ไม่สำเร็จ:", error)
-      alert("ไม่สามารถลบหมวดหมู่ที่มีเมนูอาหารอยู่ได้ กรุณาลบเมนูในหมวดหมู่นี้ออกก่อน")
-    }
+    } catch { console.log("ลบหมวดหมู่ไม่สำเร็จ") }
   }
 
   const resetAdd = () => {
@@ -510,7 +507,7 @@ const styles = StyleSheet.create({
   fix1: { padding: 5, backgroundColor: "rgb(14, 84, 236)", marginRight: 10, borderRadius: 5, alignItems: "center" },
   edit: { padding: 5, backgroundColor: "rgb(14, 84, 236)", marginRight: 10, borderRadius: 5, alignItems: "center", marginTop: 10, width: 50 },
   table: { flex: 1 },
-  namefood: { borderColor: "rgba(172, 169, 169, 0.9)", fontWeight: "bold", fontSize: 15, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, paddingLeft: 10, borderRadius: 15,paddingRight:10 },
+  namefood: { borderColor: "rgba(172, 169, 169, 0.9)", fontWeight: "bold", fontSize: 19, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, paddingLeft: 10, borderRadius: 15,paddingRight:10 },
   datafood: { borderColor: "rgba(172, 169, 169, 0.9)", fontSize: 15, borderWidth: 1, height: 25, padding: 0, width: 150, marginBottom: 5, borderRadius: 15, paddingLeft: 10,paddingRight:10 },
   butaddfood: { backgroundColor: colors.text, padding: 5, borderRadius: 20, marginBottom: 5, marginTop: 5, alignItems: "center", boxShadow: "0 0 6px rgba(0, 0, 0, 0.5)" },
   cardaddfood: { borderBottomWidth: 1, borderColor: "rgba(232, 227, 227, 1)", flexDirection: "column", width: "100%", alignItems: "center", marginTop: 10 },

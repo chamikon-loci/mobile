@@ -254,10 +254,10 @@ export async function addMenu(db, name, unitPrice, categoryId, image) {
 }
 
 export async function deleteMenu(db, menuId) {
-    await db.runAsync(
-        `DELETE FROM Menu WHERE menu_id=?`,
-        [menuId]
-    )
+    await db.withTransactionAsync(async () => {
+        await db.runAsync(`DELETE FROM Order_Items WHERE menu_id=?`, [menuId])
+        await db.runAsync(`DELETE FROM Menu WHERE menu_id=?`, [menuId])
+    })
 }
 
 export async function getAllCategories(db) {

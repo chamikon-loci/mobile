@@ -128,10 +128,7 @@ function MenuScreen({ changepage }) {
     try {
       await deleteCategory(db, id)
       await loadCategories()
-    } catch (error) {
-      console.log("ลบหมวดหมู่ไม่สำเร็จ:", error)
-      alert("ไม่สามารถลบหมวดหมู่ที่มีเมนูอาหารอยู่ได้ กรุณาลบเมนูในหมวดหมู่นี้ออกก่อน")
-    }
+    } catch { console.log("ลบหมวดหมู่ไม่สำเร็จ") }
   }
 
   const resetAdd = () => {
